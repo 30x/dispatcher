@@ -1,0 +1,10 @@
+package: github.com/30x/dispatcher
+import:
+- package: github.com/spf13/viper
+- package: k8s.io/kubernetes
+  subpackages:
+  - pkg/client/restclient
+  - pkg/client/unversioned
+  - pkg/client/unversioned/clientcmd
+  - pkg/labels
+  - pkg/util/validation
