@@ -3,7 +3,7 @@ package router
 import (
 	"fmt"
 	"strings"
-	
+
 	"github.com/30x/dispatcher/pkg/utils"
 	"github.com/spf13/viper"
 
@@ -58,7 +58,6 @@ type NginxConfig struct {
 	Port int
 }
 
-
 // addConfig adds a default and env binding to viper
 func addConfig(prop, env string, value interface{}) {
 	viper.SetDefault(prop, value)
@@ -84,7 +83,7 @@ func validateLabelSelector(value string) error {
 		return nil
 	}
 }
-	
+
 /*
 ConfigFromEnv returns the configuration based on the environment variables and validates the values
 */
@@ -110,7 +109,7 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("PodsPathsAnnotation", "PATHS_ANNOTATION", "github.com/30x.dispatcher.paths")
 
 	// Nginx Configuration
-	// 
+	//
 	// The header name used to identify the API Key
 	addConfig("Nginx.APIKeyHeader", "API_KEY_HEADER", "X-ROUTING-API-KEY")
 	// Enable or disable nginx health checks using custom upstream check module. Default: disabled
@@ -138,7 +137,7 @@ func ConfigFromEnv() (*Config, error) {
 			return nil, err
 		}
 	}
-		
+
 	// Validate Nginx port
 	if err != nil || !utils.IsValidPort(config.Nginx.Port) {
 		return nil, fmt.Errorf(ErrMsgTmplInvalidPort, config.Nginx.Port)
