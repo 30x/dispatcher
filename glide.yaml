@@ -1,10 +1,13 @@
 package: github.com/30x/dispatcher
 import:
 - package: github.com/spf13/viper
-- package: k8s.io/kubernetes
+- package: k8s.io/client-go
+  version: ^2.0.0-alpha.0
   subpackages:
-  - pkg/client/restclient
-  - pkg/client/unversioned
-  - pkg/client/unversioned/clientcmd
+  - kubernetes
+  - pkg/api
+  - pkg/api/v1
   - pkg/labels
   - pkg/util/validation
+  - rest
+  - tools/clientcmd

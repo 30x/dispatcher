@@ -7,8 +7,8 @@ import (
 	"github.com/30x/dispatcher/pkg/utils"
 	"github.com/spf13/viper"
 
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/util/validation"
 )
 
 const (
@@ -69,9 +69,8 @@ func validateAnnotation(value string) error {
 	errs := validation.IsQualifiedName(strings.ToLower(value))
 	if len(errs) > 0 {
 		return fmt.Errorf(ErrMsgTmplInvalidAnnotationName, value, errs[0])
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // validateLabelSelector validates k8s label selector query
@@ -79,9 +78,8 @@ func validateLabelSelector(value string) error {
 	_, err := labels.Parse(value)
 	if err != nil {
 		return fmt.Errorf(ErrMsgTmplInvalidLabelSelector, value, err)
-	} else {
-		return nil
 	}
+	return nil
 }
 
 /*

@@ -20,29 +20,29 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Check if running in cluster
-func RunningInCluster() (bool)  {
+func RunningInCluster() bool {
 	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token"); err == nil {
-		return true;
+		return true
 	} else {
-		return false;
+		return false
 	}
 }
 
 /*
 GetClient returns a Kubernetes client.
 */
-func GetClient() (*client.Client, error) {
-	var kubeConfig restclient.Config
+func GetClient() (*kubernetes.Clientset, error) {
+	var kubeConfig rest.Config
 
 	// Set the Kubernetes configuration based on the environment
 	if RunningInCluster() {
-		config, err := restclient.InClusterConfig()
+		config, err := rest.InClusterConfig()
 
 		if err != nil {
 			return nil, fmt.Errorf("Failed to create in-cluster config: %v.", err)
@@ -57,10 +57,10 @@ func GetClient() (*client.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to load local kube config: %v", err)
 		}
-		kubeConfig = *tmpKubeConfig;
+
+		kubeConfig = *tmpKubeConfig
 	}
 
-
 	// Create the Kubernetes client based on the configuration
-	return client.New(&kubeConfig)
+	return kubernetes.NewForConfig(&kubeConfig)
 }
