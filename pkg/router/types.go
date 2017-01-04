@@ -1,8 +1,30 @@
 package router
 
 import (
-	"k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/watch"
 )
+
+/*
+WatchableResourceSet provides an interface to a k8s resource that is watchable by dispatcher.
+Implementation must provide Get, Watch methods and a way to convert k8s object to a dispatch WatchableResource model
+*/
+type WatchableResourceSet interface {
+	// Returns all current k8s resources converted to the appropriate model
+	Get() ([]WatchableResource, string, error)
+	// Returns a k8s watch.Interface subscribing to changes
+	Watch(resouceVersion string) (watch.Interface, error)
+	// Converts a k8s object into a WatchableResource per type
+	ConvertToModel(interface{}) WatchableResource
+}
+
+/*
+WatchableResource interface that each watchable resource most implement. Id() as the cache key and a hash method for comparison
+*/
+type WatchableResource interface {
+	Id() string
+	Hash() uint64
+}
 
 /*
 Cache is the structure containing the router API Keys and the routable pods cache and namespaces
@@ -10,15 +32,7 @@ Cache is the structure containing the router API Keys and the routable pods cach
 type Cache struct {
 	Namespaces map[string]*Namespace
 	Pods       map[string]*PodWithRoutes
-	Secrets    map[string][]byte
-}
-
-/*
-Namespace describes the information stored on the k8s namespace object for routing
-*/
-type Namespace struct {
-	Name  string
-	Hosts []string
+	Secrets    map[string]*Secret
 }
 
 /*
@@ -26,11 +40,11 @@ PodWithRoutes contains a pod and its routes
 */
 type PodWithRoutes struct {
 	Name      string
-	Namespace *Namespace
+	Namespace string
 	Status    api.PodPhase
+	Routes    []*Route
 	// Hash of annotation to quickly compare changes
-	AnnotationHash uint64
-	Routes         []*Route
+	hash uint64
 }
 
 /*

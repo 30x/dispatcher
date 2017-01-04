@@ -1,8 +1,11 @@
 package router
 
 import (
+	"hash/fnv"
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
+	//	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/watch"
 	"log"
 	"regexp"
 	"strings"
@@ -16,6 +19,9 @@ const (
 var hostnameRegex *regexp.Regexp
 var ipRegex *regexp.Regexp
 
+/*
+init builds all regex needed for validation
+*/
 func init() {
 	// Compile all regular expressions
 	hostnameRegex = compileRegex(hostnameRegexStr)
@@ -23,29 +29,98 @@ func init() {
 }
 
 /*
-GetNamespaces returns all namespaces that match selector
+NamespaceWatchableSet implements WatchableResourceSet interface to provide access to k8s namespace resouces.
 */
-func GetNamespaces(config *Config, kubeClient *kubernetes.Clientset) (*api.NamespaceList, error) {
-	// Query the initial list of Pods
-	return kubeClient.Core().Namespaces().List(api.ListOptions{
-		LabelSelector: config.NamespaceRoutableLabelSelector,
-	})
+type NamespaceWatchableSet struct {
+	Config     *Config
+	KubeClient *kubernetes.Clientset
 }
 
 /*
- Converts a Kubernetes namespace model to a dispatcher namespace model
+Namespace describes the information stored on the k8s namespace object for routing
 */
-func ConvertNamespaceToModel(config *Config, namespace *api.Namespace) *Namespace {
-	return &Namespace{
-		Name:  namespace.Name,
-		Hosts: GetHostsFromNamespace(config, namespace),
+type Namespace struct {
+	Name         string
+	Hosts        []string
+	Organization string
+	Environment  string
+	// Hash of annotation to quickly compare changes
+	hash uint64
+}
+
+/*
+Id returns the namespace's name
+*/
+func (ns Namespace) Id() string {
+	return ns.Name
+}
+
+/*
+Hash returns the stored version of all the annotations hashed using fnv
+*/
+func (ns Namespace) Hash() uint64 {
+	return ns.hash
+}
+
+/*
+Watch returns a k8s watch.Interface that subscribes to any namespace changes
+*/
+func (s NamespaceWatchableSet) Watch(resouceVersion string) (watch.Interface, error) {
+	// Get the list options so we can create the watch
+	namespacesWatchOptions := api.ListOptions{
+		LabelSelector:   s.Config.NamespaceRoutableLabelSelector,
+		ResourceVersion: resouceVersion,
 	}
+
+	// Create a watcher to be notified of Namespace events
+	watcher, err := s.KubeClient.Core().Namespaces().Watch(namespacesWatchOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return watcher, nil
+}
+
+/*
+Get returns a list of Namespace in the form of a WatchableResource interface and a k8s resource version. If any k8s client errors occur it is returned.
+*/
+func (s NamespaceWatchableSet) Get() ([]WatchableResource, string, error) {
+	// Query the initial list of Namespaces
+	k8sNamespaces, err := s.KubeClient.Core().Namespaces().List(api.ListOptions{
+		LabelSelector: s.Config.NamespaceRoutableLabelSelector,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	namespaces := make([]WatchableResource, len(k8sNamespaces.Items))
+
+	for i, ns := range k8sNamespaces.Items {
+		namespaces[i] = s.ConvertToModel(ns)
+	}
+
+	return namespaces, k8sNamespaces.ListMeta.ResourceVersion, nil
+}
+
+/*
+ConvertToModel takes in a k8s api.Namespace as a blank interface and converts it to a Namespace as a WatchableResource
+*/
+func (s NamespaceWatchableSet) ConvertToModel(in interface{}) WatchableResource {
+	namespace := in.(api.Namespace)
+	ns := Namespace{
+		Name:         namespace.Name,
+		Hosts:        getHostsFromNamespace(s.Config, &namespace),
+		Organization: namespace.Annotations[s.Config.NamespaceOrgAnnotation],
+		Environment:  namespace.Annotations[s.Config.NamespaceEnvAnnotation],
+		hash:         calculateNamespaceHash(s.Config, &namespace),
+	}
+	return ns
 }
 
 /*
 GetHostsFromNamespace returns all valid hosts from configured host annotation on Namespace
 */
-func GetHostsFromNamespace(config *Config, namespace *api.Namespace) []string {
+func getHostsFromNamespace(config *Config, namespace *api.Namespace) []string {
 	var hosts []string
 
 	annotation, ok := namespace.Annotations[config.NamespaceHostsAnnotation]
@@ -72,7 +147,9 @@ func GetHostsFromNamespace(config *Config, namespace *api.Namespace) []string {
 	return hosts
 }
 
-// compileRegex returns a regex object from a regex string
+/*
+compileRegex returns a regex object from a regex string
+*/
 func compileRegex(regexStr string) *regexp.Regexp {
 	compiled, err := regexp.Compile(regexStr)
 
@@ -81,4 +158,15 @@ func compileRegex(regexStr string) *regexp.Regexp {
 	}
 
 	return compiled
+}
+
+/*
+ calculateNamespaceHash calculates hash for hosts and paths annotations to compare when Namespace is modified.
+*/
+func calculateNamespaceHash(config *Config, ns *api.Namespace) uint64 {
+	h := fnv.New64()
+	h.Write([]byte(ns.Annotations[config.NamespaceHostsAnnotation]))
+	h.Write([]byte(ns.Annotations[config.NamespaceOrgAnnotation]))
+	h.Write([]byte(ns.Annotations[config.NamespaceEnvAnnotation]))
+	return h.Sum64()
 }

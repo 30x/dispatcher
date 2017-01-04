@@ -4,59 +4,67 @@ import (
 	kube "github.com/30x/dispatcher/pkg/kubernetes"
 	"github.com/30x/dispatcher/pkg/router"
 	"k8s.io/client-go/kubernetes"
-	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/watch"
 	"log"
 	"time"
 )
 
-type controllerData struct {
-	cache            *router.Cache
-	namespaceWatcher watch.Interface
-	podWatcher       watch.Interface
-	secretsWatcher   watch.Interface
+// tuple for a resource watch set and the k8s watch interface
+type ResourceWatch struct {
+	Resource router.WatchableResourceSet
+	Watcher  watch.Interface
 }
 
-func initController(config *router.Config, kubeClient *kubernetes.Clientset) controllerData {
+// Struct to hold the channel index and actual event when all channels are aggregated
+type Event struct {
+	Chan  int
+	Event watch.Event
+}
+
+// Time window to capture events before prossing batch
+const eventWindow time.Duration = 2000 * time.Millisecond
+
+func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*router.Cache, []*ResourceWatch) {
+
 	// Init cache
 	cache := &router.Cache{
 		Namespaces: make(map[string]*router.Namespace),
 		Pods:       make(map[string]*router.PodWithRoutes),
-		Secrets:    make(map[string][]byte),
+		Secrets:    make(map[string]*router.Secret),
 	}
 
-	log.Println("Searching for routable namespaces")
-
-	// Query the initial list of Namespaces
-	namespaces, err := router.GetNamespaces(config, kubeClient)
-	if err != nil {
-		log.Fatalf("Failed to query the initial list of namespaces: %v.", err)
+	resourceTypes := []*ResourceWatch{
+		&ResourceWatch{router.NamespaceWatchableSet{config, kubeClient}, nil},
+		&ResourceWatch{router.SecretWatchableSet{config, kubeClient}, nil},
 	}
 
-	log.Printf("  Namespaces found: %d", len(namespaces.Items))
+	for _, res := range resourceTypes {
+		// Grab current resources from api
+		resources, version, err := res.Resource.Get()
+		if err != nil {
+			log.Fatalf("Failed to: %v.", err)
+		}
 
-	// Turn the namespaces into a map based on the namespaces's name
-	for i, ns := range namespaces.Items {
-		cache.Namespaces[ns.Name] = router.ConvertNamespaceToModel(config, &(namespaces.Items[i]))
+		// Add each resource to it's respective cache
+		for _, item := range resources {
+			err := router.AddResourceToCache(cache, item)
+			if err != nil {
+				log.Println("unknown resource type for cache")
+			}
+		}
+
+		// Create watcher for each resource
+		watcher, err := res.Resource.Watch(version)
+		if err != nil {
+			log.Fatalf("Failed to create watcher: %v.", err)
+		}
+
+		res.Watcher = watcher
 	}
 
-	// Get the list options so we can create the watch
-	namespacesWatchOptions := api.ListOptions{
-		LabelSelector:   config.NamespaceRoutableLabelSelector,
-		ResourceVersion: namespaces.ListMeta.ResourceVersion,
-	}
+	// Generate the nginx configuration and restart nginx
 
-	// Create a watcher to be notified of Pod events
-	namespaceWatcher, err := kubeClient.Core().Namespaces().Watch(namespacesWatchOptions)
-
-	if err != nil {
-		log.Fatalf("Failed to create namespace watcher: %v.", err)
-	}
-
-	return controllerData{
-		cache:            cache,
-		namespaceWatcher: namespaceWatcher,
-	}
+	return cache, resourceTypes
 }
 
 func main() {
@@ -74,63 +82,63 @@ func main() {
 		log.Fatalf("Failed to create client: %v.", err)
 	}
 
-	// Create the initial cache and watchers
-	controllerData := initController(config, kubeClient)
-
 	// Loop forever
 	for {
-		var namespaceEvents []watch.Event
-		var podEvents []watch.Event
-		var secretEvents []watch.Event
+		// Create the initial cache and watchers
+		_, resourceTypes := initController(config, kubeClient)
 
-		// Get a 2 seconds window worth of events
-		for {
-			doRestart := false
-			doStop := false
+		// List of events gathered during window
+		events := []Event{}
+		// Create done channel that is called if any watchers close
+		done := make(chan struct{})
+		combinedChannel := make(chan Event)
 
-			select {
-			case event, ok := <-controllerData.namespaceWatcher.ResultChan():
-				if !ok {
-					log.Println("Kubernetes closed the namespace watcher, restarting")
-					doRestart = true
-				} else {
-					namespaceEvents = append(namespaceEvents, event)
+		// Aggragate all resource types into one channel
+		for i, res := range resourceTypes {
+			go func(n int, c <-chan watch.Event) {
+				for v := range c {
+					combinedChannel <- Event{n, v}
 				}
+				done <- struct{}{}
+			}(i, res.Watcher.ResultChan())
+		}
 
-				// TODO: Rewrite to start the two seconds after the first post-restart event is seen
-			case <-time.After(2 * time.Second):
-				doStop = true
-			}
+		// Keep track of the first event seen and when happened to start the timer of when to stop
+		firstEvent := false
+		start := time.Now()
+		waitTime := eventWindow
 
-			if doStop {
-				break
-			} else if doRestart {
-				controllerData.namespaceWatcher.Stop()
-
-				controllerData = initController(config, kubeClient)
+		// process events from watchers until channels shutdown
+	Process:
+		for {
+			select {
+			case e := <-combinedChannel:
+				if !firstEvent {
+					// First event seen since timer triggered, start clock now
+					firstEvent = true
+					start = time.Now()
+				} else {
+					// Update waitTime from when the first event was seen
+					waitTime = eventWindow - time.Since(start)
+				}
+				events = append(events, e)
+			case <-time.After(waitTime):
+				// Process all events for the event window
+				// If need restart restart
+				events = []Event{}
+				waitTime = eventWindow
+				firstEvent = false
+			case <-done:
+				// Shutdown all watchers and restart
+				for _, res := range resourceTypes {
+					res.Watcher.Stop()
+				}
+				// Break out of processing
+				break Process
 			}
 		}
 
-		needsRestart := false
-
-		if len(namespaceEvents) > 0 {
-			log.Printf("%d namespace events found", len(namespaceEvents))
-
-			// Update the cache based on the events and check if the server needs to be restarted
-			//needsRestart = router.UpdatePodCacheForEvents(config, cache.Namespaces, namespaceEvents)
-		}
-
-		// Wrapped in an if/else to limit logging
-		if len(namespaceEvents) > 0 || len(podEvents) > 0 || len(secretEvents) > 0 {
-			if needsRestart {
-				log.Println("  Requires nginx restart: yes")
-
-				// Restart nginx
-				// nginx.RestartServer(nginx.GetConf(config, cache), false)
-			} else {
-				log.Println("  Requires nginx restart: no")
-			}
-		}
+		log.Println("Watchers exited, restarting.")
 	}
 
 }
