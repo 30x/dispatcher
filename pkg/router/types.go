@@ -25,7 +25,7 @@ type WatchableResourceSet interface {
 	// Takes a resource and compares it to the resource in the Cache based on it's id, returns true if equal. Returns false otherwise and if the cache object does not exist.
 	CacheCompare(*Cache, WatchableResource) bool
 	// Returns the cache id of the k8s object without having to convert it fully to the Dispatcher model
-	IdFromObject(interface{}) string
+	IDFromObject(interface{}) string
 }
 
 /*

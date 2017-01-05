@@ -19,7 +19,7 @@ func ProcessEvent(cache *Cache, resourceType WatchableResourceSet, event watch.E
 		return true
 	case watch.Deleted:
 		// Resource delete try and remove from cache
-		resourceType.CacheRemove(cache, resourceType.IdFromObject(event.Object))
+		resourceType.CacheRemove(cache, resourceType.IDFromObject(event.Object))
 		// TODO: What if the resource was never in the cache, should we not restart?
 		return true
 	case watch.Modified:
@@ -34,7 +34,7 @@ func ProcessEvent(cache *Cache, resourceType WatchableResourceSet, event watch.E
 			}
 		} else {
 			// If Resource is no longer watchable remove from cache
-			resourceType.CacheRemove(cache, resourceType.IdFromObject(event.Object))
+			resourceType.CacheRemove(cache, resourceType.IDFromObject(event.Object))
 			return true
 		}
 	}

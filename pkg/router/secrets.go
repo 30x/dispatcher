@@ -137,7 +137,7 @@ func (s SecretWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource
 /*
 IdFromObject returns the Namespace name from the *api.Secret
 */
-func (s SecretWatchableSet) IdFromObject(in interface{}) string {
+func (s SecretWatchableSet) IDFromObject(in interface{}) string {
 	secret := in.(*api.Secret)
 	return secret.Namespace
 }

@@ -157,7 +157,7 @@ func (s NamespaceWatchableSet) CacheCompare(cache *Cache, newItem WatchableResou
 /*
 IdFromObject returns the Namespaces' name from the *api.Namespace object
 */
-func (s NamespaceWatchableSet) IdFromObject(in interface{}) string {
+func (s NamespaceWatchableSet) IDFromObject(in interface{}) string {
 	namespace := in.(*api.Namespace)
 	return namespace.Name
 }
