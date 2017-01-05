@@ -107,7 +107,7 @@ ConvertToModel takes in a k8s *api.Namespace as a blank interface and converts i
 */
 func (s NamespaceWatchableSet) ConvertToModel(in interface{}) WatchableResource {
 	namespace := in.(*api.Namespace)
-	ns := Namespace{
+	ns := &Namespace{
 		Name:         namespace.Name,
 		Hosts:        getHostsFromNamespace(s.Config, namespace),
 		Organization: namespace.Annotations[s.Config.NamespaceOrgAnnotation],
@@ -132,8 +132,8 @@ func (s NamespaceWatchableSet) Watchable(in interface{}) bool {
 CacheAdd adds Namespace to the cache's namespace bucket
 */
 func (s NamespaceWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
-	namespace := item.(Namespace)
-	cache.Namespaces[item.Id()] = &namespace
+	namespace := item.(*Namespace)
+	cache.Namespaces[item.Id()] = namespace
 }
 
 /*

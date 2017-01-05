@@ -93,7 +93,7 @@ ConvertToModel converts an *api.Secret k8s secret to a WatchableResource
 */
 func (s SecretWatchableSet) ConvertToModel(in interface{}) WatchableResource {
 	k8Secret := in.(*api.Secret)
-	secret := Secret{
+	secret := &Secret{
 		Namespace: k8Secret.Namespace,
 		Data:      k8Secret.Data[s.Config.APIKeySecretDataField],
 	}
@@ -112,8 +112,8 @@ func (s SecretWatchableSet) Watchable(in interface{}) bool {
 CacheAdd adds Secret to the caches Secret bucket
 */
 func (s SecretWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
-	secret := item.(Secret)
-	cache.Secrets[item.Id()] = &secret
+	secret := item.(*Secret)
+	cache.Secrets[item.Id()] = secret
 }
 
 /*

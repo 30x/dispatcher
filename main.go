@@ -27,11 +27,7 @@ const eventWindow time.Duration = 2000 * time.Millisecond
 func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*router.Cache, []*ResourceWatch) {
 
 	// Init cache
-	cache := &router.Cache{
-		Namespaces: make(map[string]*router.Namespace),
-		Pods:       make(map[string]*router.PodWithRoutes),
-		Secrets:    make(map[string]*router.Secret),
-	}
+	cache := router.NewCache()
 
 	// Create each watchable resource set. Namespaces, Secrets, Pods, etc...
 	resourceTypes := []*ResourceWatch{

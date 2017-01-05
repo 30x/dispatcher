@@ -42,3 +42,14 @@ func ProcessEvent(cache *Cache, resourceType WatchableResourceSet, event watch.E
 	// Nothing's changed don't restart
 	return false
 }
+
+/*
+NewCache returns a create a Cache object and returns a pointer to the object
+*/
+func NewCache() *Cache {
+	return &Cache{
+		Namespaces: make(map[string]*Namespace),
+		Pods:       make(map[string]*PodWithRoutes),
+		Secrets:    make(map[string]*Secret),
+	}
+}
