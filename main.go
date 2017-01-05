@@ -33,6 +33,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 		Secrets:    make(map[string]*router.Secret),
 	}
 
+	// Create each watchable resource set. Namespaces, Secrets, Pods, etc...
 	resourceTypes := []*ResourceWatch{
 		&ResourceWatch{router.NamespaceWatchableSet{config, kubeClient}, nil},
 		&ResourceWatch{router.SecretWatchableSet{config, kubeClient}, nil},
@@ -47,10 +48,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 
 		// Add each resource to it's respective cache
 		for _, item := range resources {
-			err := router.AddResourceToCache(cache, item)
-			if err != nil {
-				log.Println("unknown resource type for cache")
-			}
+			res.Resource.CacheAdd(cache, item)
 		}
 
 		// Create watcher for each resource
@@ -63,6 +61,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 	}
 
 	// Generate the nginx configuration and restart nginx
+	// TODO: Restart nginx
 
 	return cache, resourceTypes
 }
@@ -85,7 +84,7 @@ func main() {
 	// Loop forever
 	for {
 		// Create the initial cache and watchers
-		_, resourceTypes := initController(config, kubeClient)
+		cache, resourceTypes := initController(config, kubeClient)
 
 		// List of events gathered during window
 		events := []Event{}
@@ -121,10 +120,25 @@ func main() {
 					// Update waitTime from when the first event was seen
 					waitTime = eventWindow - time.Since(start)
 				}
+				// Buffer events to be processed after 2s from the first event
 				events = append(events, e)
 			case <-time.After(waitTime):
+				needsRestart := false
 				// Process all events for the event window
-				// If need restart restart
+				for _, e := range events {
+					// If data has changed restart nginx
+					if router.ProcessEvent(cache, resourceTypes[e.Chan].Resource, e.Event) {
+						needsRestart = true
+					}
+				}
+
+				//  If nginx needs restart
+				if needsRestart {
+					log.Println("Nginx needs restart.")
+					// TODO: Restart nginx
+				}
+
+				// Clear events and reset the wait time for the event window
 				events = []Event{}
 				waitTime = eventWindow
 				firstEvent = false

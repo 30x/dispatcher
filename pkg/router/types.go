@@ -16,6 +16,16 @@ type WatchableResourceSet interface {
 	Watch(resouceVersion string) (watch.Interface, error)
 	// Converts a k8s object into a WatchableResource per type
 	ConvertToModel(interface{}) WatchableResource
+	//Watchable takes in a k8s object as a generic interface and tests if the resouce should be watched by dispatcher using it's label selectors
+	Watchable(interface{}) bool
+	// Adds Resouce to Cache in the proper bucket based on it's type
+	CacheAdd(*Cache, WatchableResource)
+	// Removes a Resouce from Cache's bucket based on it's type
+	CacheRemove(*Cache, string)
+	// Takes a resource and compares it to the resource in the Cache based on it's id, returns true if equal. Returns false otherwise and if the cache object does not exist.
+	CacheCompare(*Cache, WatchableResource) bool
+	// Returns the cache id of the k8s object without having to convert it fully to the Dispatcher model
+	IdFromObject(interface{}) string
 }
 
 /*

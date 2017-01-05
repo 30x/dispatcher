@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
-	//	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/watch"
 	"log"
 	"regexp"
@@ -96,25 +96,70 @@ func (s NamespaceWatchableSet) Get() ([]WatchableResource, string, error) {
 	namespaces := make([]WatchableResource, len(k8sNamespaces.Items))
 
 	for i, ns := range k8sNamespaces.Items {
-		namespaces[i] = s.ConvertToModel(ns)
+		namespaces[i] = s.ConvertToModel(&ns)
 	}
 
 	return namespaces, k8sNamespaces.ListMeta.ResourceVersion, nil
 }
 
 /*
-ConvertToModel takes in a k8s api.Namespace as a blank interface and converts it to a Namespace as a WatchableResource
+ConvertToModel takes in a k8s *api.Namespace as a blank interface and converts it to a Namespace as a WatchableResource
 */
 func (s NamespaceWatchableSet) ConvertToModel(in interface{}) WatchableResource {
-	namespace := in.(api.Namespace)
+	namespace := in.(*api.Namespace)
 	ns := Namespace{
 		Name:         namespace.Name,
-		Hosts:        getHostsFromNamespace(s.Config, &namespace),
+		Hosts:        getHostsFromNamespace(s.Config, namespace),
 		Organization: namespace.Annotations[s.Config.NamespaceOrgAnnotation],
 		Environment:  namespace.Annotations[s.Config.NamespaceEnvAnnotation],
-		hash:         calculateNamespaceHash(s.Config, &namespace),
+		hash:         calculateNamespaceHash(s.Config, namespace),
 	}
 	return ns
+}
+
+/*
+Watchable tests where the *api.Namespace has the routable label selector for the namespace to be watched.
+*/
+func (s NamespaceWatchableSet) Watchable(in interface{}) bool {
+	// TODO: add label.Selector on config to avoid parsing on every comparison
+	// Ignore err we've already checked in the config
+	selector, _ := labels.Parse(s.Config.NamespaceRoutableLabelSelector)
+	namespace := in.(*api.Namespace)
+	return selector.Matches(labels.Set(namespace.Labels))
+}
+
+/*
+CacheAdd adds Namespace to the cache's namespace bucket
+*/
+func (s NamespaceWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
+	namespace := item.(Namespace)
+	cache.Namespaces[item.Id()] = &namespace
+}
+
+/*
+CacheRemove removes the Namespace using the id given from the Cache's Namespaces bucket
+*/
+func (s NamespaceWatchableSet) CacheRemove(cache *Cache, id string) {
+	delete(cache.Namespaces, id)
+}
+
+/*
+CacheCompare compares the given Namespace with the namespace in the cache, if equal returns true otherwise returns false. If cache value does not exist return false.
+*/
+func (s NamespaceWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource) bool {
+	item, ok := cache.Namespaces[newItem.Id()]
+	if !ok {
+		return false
+	}
+	return item.Hash() == newItem.Hash()
+}
+
+/*
+IdFromObject returns the Namespaces' name from the *api.Namespace object
+*/
+func (s NamespaceWatchableSet) IdFromObject(in interface{}) string {
+	namespace := in.(*api.Namespace)
+	return namespace.Name
 }
 
 /*

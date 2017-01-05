@@ -78,7 +78,7 @@ func (s SecretWatchableSet) Get() ([]WatchableResource, string, error) {
 		if secret.Name == s.Config.APIKeySecret {
 			_, ok := secret.Data[s.Config.APIKeySecretDataField]
 			if ok {
-				secrets = append(secrets, s.ConvertToModel(secret))
+				secrets = append(secrets, s.ConvertToModel(&secret))
 			} else {
 				log.Printf("    Router secret for namespace (%s) is not usable: Missing '%s' key\n", secret.Namespace, s.Config.APIKeySecretDataField)
 			}
@@ -89,13 +89,55 @@ func (s SecretWatchableSet) Get() ([]WatchableResource, string, error) {
 }
 
 /*
-ConvertToModel converts an k8s secret to a WatchableResource
+ConvertToModel converts an *api.Secret k8s secret to a WatchableResource
 */
 func (s SecretWatchableSet) ConvertToModel(in interface{}) WatchableResource {
-	k8Secret := in.(api.Secret)
+	k8Secret := in.(*api.Secret)
 	secret := Secret{
 		Namespace: k8Secret.Namespace,
 		Data:      k8Secret.Data[s.Config.APIKeySecretDataField],
 	}
 	return secret
+}
+
+/*
+Watchable tests where the *api.Secret inputed has the Name of of the configured APIKeySecret
+*/
+func (s SecretWatchableSet) Watchable(in interface{}) bool {
+	k8Secret := in.(*api.Secret)
+	return k8Secret.Name == s.Config.APIKeySecret
+}
+
+/*
+CacheAdd adds Secret to the caches Secret bucket
+*/
+func (s SecretWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
+	secret := item.(Secret)
+	cache.Secrets[item.Id()] = &secret
+}
+
+/*
+CacheRemove removes the Secret using the id given from the Cache's Secrets bucket
+*/
+func (s SecretWatchableSet) CacheRemove(cache *Cache, id string) {
+	delete(cache.Secrets, id)
+}
+
+/*
+CacheCompare compares the given Secret with the Secret in the cache, if equal returns true otherwise returns false. If cache value does not exist return false.
+*/
+func (s SecretWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource) bool {
+	item, ok := cache.Secrets[newItem.Id()]
+	if !ok {
+		return false
+	}
+	return item.Hash() == newItem.Hash()
+}
+
+/*
+IdFromObject returns the Namespace name from the *api.Secret
+*/
+func (s SecretWatchableSet) IdFromObject(in interface{}) string {
+	secret := in.(*api.Secret)
+	return secret.Namespace
 }
