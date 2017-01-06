@@ -1,7 +1,6 @@
 package router
 
 import (
-	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/watch"
 )
 
@@ -44,40 +43,4 @@ type Cache struct {
 	Namespaces map[string]*Namespace
 	Pods       map[string]*PodWithRoutes
 	Secrets    map[string]*Secret
-}
-
-/*
-PodWithRoutes contains a pod and its routes
-*/
-type PodWithRoutes struct {
-	Name      string
-	Namespace string
-	Status    api.PodPhase
-	Routes    []*Route
-	// Hash of annotation to quickly compare changes
-	hash uint64
-}
-
-/*
-Route describes the incoming route matching details and the outgoing proxy backend details
-*/
-type Route struct {
-	Incoming *Incoming
-	Outgoing *Outgoing
-}
-
-/*
-Incoming describes the information required to route an incoming request
-*/
-type Incoming struct {
-	Path string
-}
-
-/*
-Outgoing describes the information required to proxy to a backend
-*/
-type Outgoing struct {
-	IP         string
-	Port       string
-	TargetPath string
 }
