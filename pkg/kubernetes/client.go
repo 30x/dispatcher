@@ -25,7 +25,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Check if running in cluster
+/*
+RunningInCluster returns true if program is found to be running inside the k8s cluster.
+*/
 func RunningInCluster() bool {
 	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token"); err == nil {
 		return true
@@ -35,7 +37,7 @@ func RunningInCluster() bool {
 }
 
 /*
-GetClient returns a Kubernetes client.
+GetClient returns a Kubernetes client using either the InclusterConfig or .kube config directory
 */
 func GetClient() (*kubernetes.Clientset, error) {
 	var kubeConfig rest.Config
