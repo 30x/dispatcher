@@ -24,9 +24,9 @@ func init() {
 }
 
 /*
-Test for github.com/30x/dispatcher/pkg/router#Secret.Id
+Test for github.com/30x/dispatcher/pkg/router#SecretWatchableSet.Get
 */
-func TestSecretsGet(t *testing.T) {
+func TestSecretWatchableSetGet(t *testing.T) {
 	set := SecretWatchableSet{Config: config, KubeClient: client}
 	list, version, err := set.Get()
 	if err != nil {
@@ -42,5 +42,16 @@ func TestSecretsGet(t *testing.T) {
 		if secret.Namespace == "" {
 			t.Fatalf("Secret Namespace must be set")
 		}
+	}
+}
+
+/*
+Test for github.com/30x/dispatcher/pkg/router#SecretWatchableSet.Watch
+*/
+func TestSecretWatchableSetWatch(t *testing.T) {
+	set := SecretWatchableSet{Config: config, KubeClient: client}
+	_, err := set.Watch("")
+	if err != nil {
+		t.Fatalf("Failed to create watcher: %v.", err)
 	}
 }

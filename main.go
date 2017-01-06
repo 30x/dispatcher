@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-// tuple for a resource watch set and the k8s watch interface
+// ResourceWatch tuple for a resource watch set and the k8s watch interface
 type ResourceWatch struct {
 	Resource router.WatchableResourceSet
 	Watcher  watch.Interface
 }
 
-// Struct to hold the channel index and actual event when all channels are aggregated
+// Event Struct to hold the channel index and actual event when all channels are aggregated
 type Event struct {
 	Chan  int
 	Event watch.Event

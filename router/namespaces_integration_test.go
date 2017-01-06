@@ -13,9 +13,9 @@ func init() {
 }
 
 /*
-Test for github.com/30x/dispatcher/pkg/router#Secret.Id
+Test for github.com/30x/dispatcher/pkg/router#NamespaceWatchableSet.Get
 */
-func TestNamespacesGet(t *testing.T) {
+func TestNamespaceWatchableSetGet(t *testing.T) {
 	set := NamespaceWatchableSet{Config: config, KubeClient: client}
 	_, version, err := set.Get()
 	if err != nil {
@@ -24,5 +24,16 @@ func TestNamespacesGet(t *testing.T) {
 
 	if version == "" {
 		t.Fatalf("Version must be set: %v.", version)
+	}
+}
+
+/*
+Test for github.com/30x/dispatcher/pkg/router#NamespaceWatchableSet.Watch
+*/
+func TestNamespaceWatchableSetWatch(t *testing.T) {
+	set := NamespaceWatchableSet{Config: config, KubeClient: client}
+	_, err := set.Watch("")
+	if err != nil {
+		t.Fatalf("Failed to create watcher: %v.", err)
 	}
 }
