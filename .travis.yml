@@ -2,6 +2,10 @@ language: go
 
 go:
   - 1.7.x
-  
+
+before_script:
+  - mkdir ~/.kube/
+  - cp kubernetes/example_kube_config ~/.kube/config
+
 script:
   - make check
