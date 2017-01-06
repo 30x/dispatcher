@@ -26,8 +26,8 @@ Test for github.com/30x/dispatcher/pkg/router#Secret.Id
 */
 func TestSecretId(t *testing.T) {
 	secret := Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	if secret.Id() != "my-namespace" {
-		t.Fatalf("Secret Id() should be \"my-namespace\" but was %s.", secret.Id())
+	if secret.ID() != "my-namespace" {
+		t.Fatalf("Secret Id() should be \"my-namespace\" but was %s.", secret.ID())
 	}
 }
 
@@ -74,8 +74,8 @@ func TestSecretsConvertToModel(t *testing.T) {
 	secrets := SecretWatchableSet{Config: config}
 	item := secrets.ConvertToModel(&k8sSecret)
 
-	if item.Id() != "my-namespace" {
-		t.Fatalf("Secret Id() should match \"my-namespace\" but was %s", item.Id())
+	if item.ID() != "my-namespace" {
+		t.Fatalf("Secret Id() should match \"my-namespace\" but was %s", item.ID())
 	}
 
 	secret := item.(*Secret)
@@ -189,11 +189,11 @@ func TestSecretsCacheRemove(t *testing.T) {
 	set := SecretWatchableSet{Config: config}
 	secret := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
 
-	cache.Secrets[secret.Id()] = secret
+	cache.Secrets[secret.ID()] = secret
 
-	set.CacheRemove(cache, secret.Id())
+	set.CacheRemove(cache, secret.ID())
 
-	_, ok := cache.Secrets[secret.Id()]
+	_, ok := cache.Secrets[secret.ID()]
 	if ok == true {
 		t.Fatalf("Secret should be removed from cache after CacheRemove")
 	}
@@ -208,13 +208,18 @@ func TestSecretsCacheCompare(t *testing.T) {
 	secret1 := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
 	secret2 := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
 	secret3 := &Secret{Namespace: "my-namespace", Data: []byte{0x6, 0x7, 0x8, 0x9, 0x0}}
+	secret4 := &Secret{Namespace: "my-namespace2", Data: []byte{0x6, 0x7, 0x8, 0x9, 0x0}}
 
-	cache.Secrets[secret1.Id()] = secret1
+	cache.Secrets[secret1.ID()] = secret1
 	if set.CacheCompare(cache, secret2) != true {
 		t.Fatalf("Secret2 should match secret1 that is in cache")
 	}
 
 	if set.CacheCompare(cache, secret3) != false {
 		t.Fatalf("Secret3 should not match secret1 that is in cache")
+	}
+
+	if set.CacheCompare(cache, secret4) != false {
+		t.Fatalf("Secret4 should not match with secret that is not added to cache")
 	}
 }

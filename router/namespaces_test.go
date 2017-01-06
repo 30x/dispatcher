@@ -43,8 +43,8 @@ Test for github.com/30x/dispatcher/pkg/router#Namespace.Id
 */
 func TestNamespaceId(t *testing.T) {
 	namespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
-	if namespace.Id() != "my-namespace" {
-		t.Fatalf("Namespace Id() should be \"my-namespace\" but was %s.", namespace.Id())
+	if namespace.ID() != "my-namespace" {
+		t.Fatalf("Namespace Id() should be \"my-namespace\" but was %s.", namespace.ID())
 	}
 }
 
@@ -86,8 +86,8 @@ func TestNamespaceConvertToModel(t *testing.T) {
 	set := NamespaceWatchableSet{Config: config}
 	item := set.ConvertToModel(&k8sNamespace)
 
-	if item.Id() != "my-namespace" {
-		t.Fatalf("Namespace Id() should match \"my-namespace\" but was %s", item.Id())
+	if item.ID() != "my-namespace" {
+		t.Fatalf("Namespace Id() should match \"my-namespace\" but was %s", item.ID())
 	}
 
 	ns := item.(*Namespace)
@@ -205,11 +205,11 @@ func TestNamespacesCacheRemove(t *testing.T) {
 	set := NamespaceWatchableSet{Config: config}
 	namespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
 
-	cache.Namespaces[namespace.Id()] = &namespace
+	cache.Namespaces[namespace.ID()] = &namespace
 
-	set.CacheRemove(cache, namespace.Id())
+	set.CacheRemove(cache, namespace.ID())
 
-	_, ok := cache.Namespaces[namespace.Id()]
+	_, ok := cache.Namespaces[namespace.ID()]
 	if ok == true {
 		t.Fatalf("Namespace should be removed from cache after CacheRemove")
 	}
@@ -228,7 +228,7 @@ func TestNamespacesCacheCompare(t *testing.T) {
 	namespace3 := genNamespace("my-namespace", "org2", "test2", "org-test.ex.net api.ex.net")
 	namespace4 := genNamespace("my-namespace2", "org", "test", "org-test.ex.net api.ex.net")
 
-	cache.Namespaces[namespace1.Id()] = &namespace1
+	cache.Namespaces[namespace1.ID()] = &namespace1
 	if set.CacheCompare(cache, &namespace2) != true {
 		t.Fatalf("Namespace2 should match secret1 that is in cache")
 	}

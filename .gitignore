@@ -3,6 +3,8 @@
 *.a
 *.so
 
+coverage.out
+
 # Folders
 _obj
 _test

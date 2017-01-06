@@ -25,9 +25,9 @@ type Secret struct {
 }
 
 /*
-Id returns the namespace name
+ID returns the namespace name
 */
-func (s Secret) Id() string {
+func (s Secret) ID() string {
 	return s.Namespace
 }
 
@@ -113,7 +113,7 @@ CacheAdd adds Secret to the caches Secret bucket
 */
 func (s SecretWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
 	secret := item.(*Secret)
-	cache.Secrets[item.Id()] = secret
+	cache.Secrets[item.ID()] = secret
 }
 
 /*
@@ -127,7 +127,7 @@ func (s SecretWatchableSet) CacheRemove(cache *Cache, id string) {
 CacheCompare compares the given Secret with the Secret in the cache, if equal returns true otherwise returns false. If cache value does not exist return false.
 */
 func (s SecretWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource) bool {
-	item, ok := cache.Secrets[newItem.Id()]
+	item, ok := cache.Secrets[newItem.ID()]
 	if !ok {
 		return false
 	}
@@ -135,7 +135,7 @@ func (s SecretWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource
 }
 
 /*
-IdFromObject returns the Namespace name from the *api.Secret
+IDFromObject returns the Namespace name from the *api.Secret
 */
 func (s SecretWatchableSet) IDFromObject(in interface{}) string {
 	secret := in.(*api.Secret)

@@ -31,9 +31,8 @@ RunningInCluster returns true if program is found to be running inside the k8s c
 func RunningInCluster() bool {
 	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token"); err == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 /*
@@ -47,7 +46,7 @@ func GetClient() (*kubernetes.Clientset, error) {
 		config, err := rest.InClusterConfig()
 
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create in-cluster config: %v.", err)
+			return nil, fmt.Errorf("failed to create in-cluster config: %v", err)
 		}
 
 		kubeConfig = *config
@@ -57,7 +56,7 @@ func GetClient() (*kubernetes.Clientset, error) {
 		config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 		tmpKubeConfig, err := config.ClientConfig()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to load local kube config: %v", err)
+			return nil, fmt.Errorf("failed to load local kube config: %v", err)
 		}
 
 		kubeConfig = *tmpKubeConfig

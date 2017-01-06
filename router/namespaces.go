@@ -49,9 +49,9 @@ type Namespace struct {
 }
 
 /*
-Id returns the namespace's name
+ID returns the namespace's name
 */
-func (ns Namespace) Id() string {
+func (ns Namespace) ID() string {
 	return ns.Name
 }
 
@@ -133,7 +133,7 @@ CacheAdd adds Namespace to the cache's namespace bucket
 */
 func (s NamespaceWatchableSet) CacheAdd(cache *Cache, item WatchableResource) {
 	namespace := item.(*Namespace)
-	cache.Namespaces[item.Id()] = namespace
+	cache.Namespaces[item.ID()] = namespace
 }
 
 /*
@@ -147,7 +147,7 @@ func (s NamespaceWatchableSet) CacheRemove(cache *Cache, id string) {
 CacheCompare compares the given Namespace with the namespace in the cache, if equal returns true otherwise returns false. If cache value does not exist return false.
 */
 func (s NamespaceWatchableSet) CacheCompare(cache *Cache, newItem WatchableResource) bool {
-	item, ok := cache.Namespaces[newItem.Id()]
+	item, ok := cache.Namespaces[newItem.ID()]
 	if !ok {
 		return false
 	}
@@ -155,7 +155,7 @@ func (s NamespaceWatchableSet) CacheCompare(cache *Cache, newItem WatchableResou
 }
 
 /*
-IdFromObject returns the Namespaces' name from the *api.Namespace object
+IDFromObject returns the Namespaces' name from the *api.Namespace object
 */
 func (s NamespaceWatchableSet) IDFromObject(in interface{}) string {
 	namespace := in.(*api.Namespace)

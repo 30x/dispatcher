@@ -32,7 +32,8 @@ type WatchableResourceSet interface {
 WatchableResource interface that each watchable resource most implement. Id() as the cache key and a hash method for comparison
 */
 type WatchableResource interface {
-	Id() string
+	// ID used to store in cache
+	ID() string
 	Hash() uint64
 }
 
