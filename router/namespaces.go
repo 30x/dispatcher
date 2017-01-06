@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"hash/fnv"
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
@@ -8,7 +9,6 @@ import (
 	"k8s.io/client-go/pkg/watch"
 	"log"
 	"regexp"
-	"strings"
 )
 
 const (
@@ -41,12 +41,17 @@ Namespace describes the information stored on the k8s namespace object for routi
 */
 type Namespace struct {
 	Name         string
-	Hosts        []string
+	Hosts        map[string]HostOptions
 	Organization string
 	Environment  string
 	// Hash of annotation to quickly compare changes
 	hash uint64
 }
+
+/*
+HostOptions contains any options for the host. Nothing right now.
+*/
+type HostOptions struct{}
 
 /*
 ID returns the namespace's name
@@ -165,29 +170,33 @@ func (s NamespaceWatchableSet) IDFromObject(in interface{}) string {
 /*
 GetHostsFromNamespace returns all valid hosts from configured host annotation on Namespace
 */
-func getHostsFromNamespace(config *Config, namespace *api.Namespace) []string {
-	var hosts []string
+func getHostsFromNamespace(config *Config, namespace *api.Namespace) map[string]HostOptions {
+	var hosts = map[string]HostOptions{}
 
 	annotation, ok := namespace.Annotations[config.NamespaceHostsAnnotation]
 	if !ok {
 		return hosts
 	}
 
+	err := json.Unmarshal([]byte(annotation), &hosts)
+	if err != nil {
+		log.Printf("Namespace (%s) host issue: %s is not a valid JSON %v\n", namespace.Name, config.NamespaceHostsAnnotation, err)
+		return hosts
+	}
+
 	// Process the routing hosts
-	for _, host := range strings.Split(annotation, " ") {
+	for host, _ := range hosts {
 		valid := hostnameRegex.MatchString(host)
 
 		if !valid {
 			valid = ipRegex.MatchString(host)
 
 			if !valid {
+				delete(hosts, host)
 				log.Printf("Namespace (%s) host issue: %s (%s) is not a valid hostname/ip\n", namespace.Name, config.NamespaceHostsAnnotation, host)
 				continue
 			}
 		}
-
-		// Record the host
-		hosts = append(hosts, host)
 	}
 	return hosts
 }

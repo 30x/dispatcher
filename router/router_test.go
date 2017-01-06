@@ -15,7 +15,7 @@ func init() {
 Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource added
 */
 func TestProcessEventResourceAdded(t *testing.T) {
-	ns := genK8sNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	ns := genK8sNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	set := NamespaceWatchableSet{Config: config}
 	cache := NewCache()
 	needsRestart := ProcessEvent(cache, set, watch.Event{
@@ -38,10 +38,10 @@ Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource deleted
 */
 func TestProcessEventResourceDeleted(t *testing.T) {
 	cache := NewCache()
-	tmpNamespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	tmpNamespace := genNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	cache.Namespaces["my-namespace"] = &tmpNamespace
 
-	ns := genK8sNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	ns := genK8sNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	set := NamespaceWatchableSet{Config: config}
 	needsRestart := ProcessEvent(cache, set, watch.Event{
 		Type:   watch.Deleted,
@@ -64,10 +64,10 @@ Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource modified u
 func TestProcessEventResourceModifiedUnChanged(t *testing.T) {
 	cache := NewCache()
 	set := NamespaceWatchableSet{Config: config}
-	tmpNamespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	tmpNamespace := genNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	cache.Namespaces["my-namespace"] = &tmpNamespace
 
-	ns := genK8sNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	ns := genK8sNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 
 	needsRestart := ProcessEvent(cache, set, watch.Event{
 		Type:   watch.Modified,
@@ -94,10 +94,10 @@ Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource modified c
 func TestProcessEventResourceModifiedChanged(t *testing.T) {
 	cache := NewCache()
 	set := NamespaceWatchableSet{Config: config}
-	tmpNamespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	tmpNamespace := genNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	cache.Namespaces["my-namespace"] = &tmpNamespace
 
-	ns := genK8sNamespace("my-namespace", "org2", "test", "org-test.ex.net api.ex.net")
+	ns := genK8sNamespace("my-namespace", "org2", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 
 	needsRestart := ProcessEvent(cache, set, watch.Event{
 		Type:   watch.Modified,
@@ -124,7 +124,7 @@ Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource modified c
 func TestProcessEventResourceModifiedChangedUnWatchable(t *testing.T) {
 	cache := NewCache()
 	set := NamespaceWatchableSet{Config: config}
-	tmpNamespace := genNamespace("my-namespace", "org", "test", "org-test.ex.net api.ex.net")
+	tmpNamespace := genNamespace("my-namespace", "org", "test", genHostsJSON("org-test.ex.net api.ex.net"))
 	cache.Namespaces["my-namespace"] = &tmpNamespace
 
 	ns := api.Namespace{
@@ -133,7 +133,7 @@ func TestProcessEventResourceModifiedChangedUnWatchable(t *testing.T) {
 			Annotations: map[string]string{
 				config.NamespaceOrgAnnotation:   "org",
 				config.NamespaceEnvAnnotation:   "test",
-				config.NamespaceHostsAnnotation: "org-test.ex.net api.ex.net",
+				config.NamespaceHostsAnnotation: genHostsJSON("org-test.ex.net api.ex.net"),
 			},
 			Labels: map[string]string{
 				"github.com/30x.dispatcher.ns": "false",
