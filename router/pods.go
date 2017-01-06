@@ -2,13 +2,27 @@ package router
 
 import (
 	"encoding/json"
+	"github.com/30x/dispatcher/utils"
 	"hash/fnv"
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/watch"
 	"log"
+	"regexp"
+	"strconv"
+	"strings"
 )
+
+const (
+	pathSegmentRegexStr = "^[A-Za-z0-9\\-._~!$&'()*+,;=:@]|%[0-9A-Fa-f]{2}$"
+)
+
+var pathSegmentRegex *regexp.Regexp
+
+func init() {
+	pathSegmentRegex = compileRegex(pathSegmentRegexStr)
+}
 
 /*
 PodWatchableSet implements WatchableResourceSet interface to provide access to k8s pod resouces.
@@ -65,7 +79,7 @@ Outgoing describes the information required to proxy to a backend
 type Outgoing struct {
 	IP          string
 	Port        string
-	TargetPath  string
+	TargetPath  *string
 	HealthCheck *HealthCheck
 }
 
@@ -113,8 +127,42 @@ func GetRoutes(config *Config, pod *api.Pod) []*Route {
 	var tmpPaths []pathAnnotation
 	err := json.Unmarshal([]byte(annotation), &tmpPaths)
 	if err != nil {
-		log.Printf("Pod %s in Namespace %s had issue parsing json path annotation %s.\n", pod.Name, pod.Namespace, config.PodsPathsAnnotation)
+		log.Printf("    Pod %s in Namespace %s had issue parsing json path annotation %s.\n", pod.Name, pod.Namespace, config.PodsPathsAnnotation)
 		return routes
+	}
+
+	// Create a list of valid routing ports
+	var ports []int32
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			ports = append(ports, port.ContainerPort)
+		}
+	}
+
+	for _, path := range tmpPaths {
+		// Check port
+		port, err := strconv.Atoi(path.ContainerPort)
+		if err != nil || !utils.IsValidPort(port) {
+			log.Printf("    Pod (%s) routing issue: %s port (%s) is not valid\n", pod.Name, config.PodsPathsAnnotation, path.ContainerPort)
+			continue
+		} else if !isContainerPort(ports, int32(port)) {
+			log.Printf("    Pod (%s) routing issue: %s port (%s) is not an exposed container port\n", pod.Name, config.PodsPathsAnnotation, path.ContainerPort)
+			continue
+		}
+
+		// Check BasePath
+		if !validatePath(path.BasePath) {
+			log.Printf("    Pod (%s) routing issue: path (%s) is not valid\n", pod.Name, path.BasePath)
+			continue
+		}
+
+		if path.TargetPath != nil && !validatePath(*path.TargetPath) {
+			log.Printf("    Pod (%s) routing issue: targetPath (%s) is not valid\n", pod.Name, path.TargetPath)
+			continue
+		}
+
+		route := Route{&Incoming{Path: path.BasePath}, &Outgoing{IP: pod.Status.PodIP, Port: path.ContainerPort, TargetPath: path.TargetPath}}
+		routes = append(routes, &route)
 	}
 
 	return routes
@@ -243,4 +291,29 @@ func calculatePodHash(config *Config, pod *api.Pod) uint64 {
 	h.Write([]byte(pod.Status.PodIP))
 	// TODO: Add healthcheck to hash
 	return h.Sum64()
+}
+
+/*
+isContainerPort returns true if supplied port is in list of ports supplied
+*/
+func isContainerPort(ports []int32, port int32) bool {
+	for _, vPort := range ports {
+		if vPort == port {
+			return true
+		}
+	}
+	return false
+}
+
+func validatePath(path string) bool {
+	pathSegments := strings.Split(path, "/")
+	for i, pathSegment := range pathSegments {
+		if (i == 0 || i == len(pathSegments)-1) && pathSegment == "" {
+			continue
+		} else if !pathSegmentRegex.MatchString(pathSegment) {
+			return false
+		}
+	}
+
+	return true
 }

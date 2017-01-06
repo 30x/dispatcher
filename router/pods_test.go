@@ -94,12 +94,24 @@ func validateRoutes(t *testing.T, desc string, expected, actual []*Route) {
 		for _, cRoute := range items {
 			if item.Incoming.Path == cRoute.Incoming.Path &&
 				item.Outgoing.IP == cRoute.Outgoing.IP &&
-				item.Outgoing.Port == cRoute.Outgoing.Port &&
-				item.Outgoing.TargetPath == cRoute.Outgoing.TargetPath {
-				route = cRoute
+				item.Outgoing.Port == cRoute.Outgoing.Port {
 
+				if item.Outgoing.TargetPath != nil && cRoute.Outgoing.TargetPath == nil {
+					continue
+				}
+
+				if item.Outgoing.TargetPath == nil && cRoute.Outgoing.TargetPath != nil {
+					continue
+				}
+
+				if item.Outgoing.TargetPath != nil && cRoute.Outgoing.TargetPath != nil && *item.Outgoing.TargetPath != *cRoute.Outgoing.TargetPath {
+					continue
+				}
+
+				route = cRoute
 				break
 			}
+
 		}
 
 		return route
@@ -147,6 +159,7 @@ func TestGetRoutesInvalidPublicPathsPort(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 
@@ -159,6 +172,7 @@ func TestGetRoutesInvalidPublicPathsPort(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 
@@ -171,6 +185,7 @@ func TestGetRoutesInvalidPublicPathsPort(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 
@@ -195,6 +210,7 @@ func TestGetRoutesInvalidPublicPathsPort(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 }
@@ -223,6 +239,7 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 
@@ -246,6 +263,7 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
 		},
 	}))
 }
@@ -304,7 +322,7 @@ func TestGetRoutesValidPods(t *testing.T) {
 			Outgoing: &Outgoing{
 				IP:         ip,
 				Port:       port1,
-				TargetPath: targetPath1,
+				TargetPath: &targetPath1,
 			},
 		},
 	}, GetRoutes(config, &api.Pod{
@@ -375,7 +393,6 @@ func TestGetRoutesValidPods(t *testing.T) {
 			PodIP: ip,
 		},
 	}))
-
 }
 
 /*
