@@ -3,6 +3,9 @@ language: go
 go:
   - 1.7.x
 
+install:
+  - go get -u github.com/golang/lint/golint
+  
 before_script:
   - mkdir ~/.kube/
   - cp kubernetes/example_kube_config ~/.kube/config
