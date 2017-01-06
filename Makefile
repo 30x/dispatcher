@@ -8,9 +8,9 @@ clean:
 	rm -f coverage.out dispatcher router/router.test kubernetes/kubernetes.test nginx/nginx.test utils/utils.test
 
 lint:
-	golint router
-	golint kubernetes
-	golint nginx
+	golint -set_exit_status router
+	golint -set_exit_status kubernetes
+	golint -set_exit_status nginx
 
 test:
 	go test -cover $$(glide novendor)
