@@ -13,10 +13,10 @@ lint:
 	golint -set_exit_status nginx
 
 test:
-	go test -cover $$(glide novendor)
+	go test -cover ./kubernetes/... ./router/... ./utils/... .
 
 test-full:
-	go test -tags=integration -cover $$(glide novendor)
+	go test -tags=integration -cover ./kubernetes/... ./router/... ./utils/... .
 
 build: main.go
 	go build
