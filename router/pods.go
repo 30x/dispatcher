@@ -104,7 +104,7 @@ func (pod PodWithRoutes) Hash() uint64 {
 }
 
 /*
-GetPodRoutes returns an array of routes defined within the provided pod
+GetRoutes returns an array of routes defined within the provided pod
 */
 func GetRoutes(config *Config, pod *api.Pod) []*Route {
 	var routes []*Route

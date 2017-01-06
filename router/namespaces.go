@@ -185,7 +185,7 @@ func getHostsFromNamespace(config *Config, namespace *api.Namespace) map[string]
 	}
 
 	// Process the routing hosts
-	for host, _ := range hosts {
+	for host := range hosts {
 		valid := hostnameRegex.MatchString(host)
 
 		if !valid {
