@@ -16,7 +16,7 @@ test:
 	go test -cover $$(glide novendor)
 
 test-full:
-	go test -tags=integration -cover $$(glide novendor) -coverprofile=coverage.out
+	go test -tags=integration -cover $$(glide novendor)
 
 build: main.go
 	go build
