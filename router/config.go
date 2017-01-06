@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/30x/dispatcher/pkg/utils"
+	"github.com/30x/dispatcher/utils"
 	"github.com/spf13/viper"
 
 	"k8s.io/client-go/pkg/labels"

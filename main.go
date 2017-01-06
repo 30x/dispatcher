@@ -1,8 +1,8 @@
 package main
 
 import (
-	kube "github.com/30x/dispatcher/pkg/kubernetes"
-	"github.com/30x/dispatcher/pkg/router"
+	kube "github.com/30x/dispatcher/kubernetes"
+	"github.com/30x/dispatcher/router"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/watch"
 	"log"

@@ -3,7 +3,7 @@
 package router
 
 import (
-	kube "github.com/30x/dispatcher/pkg/kubernetes"
+	kube "github.com/30x/dispatcher/kubernetes"
 	"k8s.io/client-go/kubernetes"
 	"log"
 	"testing"
