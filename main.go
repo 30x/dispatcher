@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	kube "github.com/30x/dispatcher/kubernetes"
+	"github.com/30x/dispatcher/nginx"
 	"github.com/30x/dispatcher/router"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/watch"
@@ -24,6 +27,26 @@ type Event struct {
 // Time window to capture events before prossing batch
 const eventWindow time.Duration = 2000 * time.Millisecond
 
+func printCache(cache *router.Cache) {
+
+	fmt.Println("Namespaces")
+	for _, ns := range cache.Namespaces {
+		fmt.Printf("  %s - %v\n", ns.Name, *ns)
+	}
+
+	fmt.Println("Secrets")
+	for _, secret := range cache.Secrets {
+		fmt.Printf("  %s - %v\n", secret.Namespace, secret.Data)
+	}
+
+	fmt.Println("Pods")
+	for _, pod := range cache.Pods {
+		b, _ := json.Marshal(pod)
+		fmt.Printf("  %s - %v\n", pod.Name, string(b))
+	}
+
+}
+
 func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*router.Cache, []*ResourceWatch) {
 
 	// Init cache
@@ -33,6 +56,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 	resourceTypes := []*ResourceWatch{
 		&ResourceWatch{router.NamespaceWatchableSet{config, kubeClient}, nil},
 		&ResourceWatch{router.SecretWatchableSet{config, kubeClient}, nil},
+		&ResourceWatch{router.PodWatchableSet{config, kubeClient}, nil},
 	}
 
 	for _, res := range resourceTypes {
@@ -81,6 +105,10 @@ func main() {
 	for {
 		// Create the initial cache and watchers
 		cache, resourceTypes := initController(config, kubeClient)
+
+		nginx.GetConf(config, cache)
+
+		printCache(cache)
 
 		// List of events gathered during window
 		events := []Event{}
@@ -132,6 +160,7 @@ func main() {
 				if needsRestart {
 					log.Println("Nginx needs restart.")
 					// TODO: Restart nginx
+					printCache(cache)
 				}
 
 				// Clear events and reset the wait time for the event window

@@ -24,9 +24,10 @@ import (
 	"os/exec"
 )
 
+// NginxConfPath for nginx configuration location
 const NginxConfPath = "/etc/nginx/nginx.conf"
 
-// If running locally enabled mock mode to not call sh commands or write config
+// RunInMockMode enables starting/stopping nginx if disabled. In mock mode starting/stopping is ignored.
 var RunInMockMode bool
 
 func shellOut(cmd string, exitOnFailure bool) {
