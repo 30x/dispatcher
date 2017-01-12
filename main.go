@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	kube "github.com/30x/dispatcher/kubernetes"
 	"github.com/30x/dispatcher/nginx"
 	"github.com/30x/dispatcher/router"
@@ -26,26 +24,6 @@ type Event struct {
 
 // Time window to capture events before prossing batch
 const eventWindow time.Duration = 2000 * time.Millisecond
-
-func printCache(cache *router.Cache) {
-
-	fmt.Println("Namespaces")
-	for _, ns := range cache.Namespaces {
-		fmt.Printf("  %s - %v\n", ns.Name, *ns)
-	}
-
-	fmt.Println("Secrets")
-	for _, secret := range cache.Secrets {
-		fmt.Printf("  %s - %v\n", secret.Namespace, secret.Data)
-	}
-
-	fmt.Println("Pods")
-	for _, pod := range cache.Pods {
-		b, _ := json.Marshal(pod)
-		fmt.Printf("  %s - %v\n", pod.Name, string(b))
-	}
-
-}
 
 func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*router.Cache, []*ResourceWatch) {
 
@@ -81,7 +59,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 	}
 
 	// Generate the nginx configuration and restart nginx
-	// TODO: Restart nginx
+	nginx.RestartServer(nginx.GetConf(config, cache), false)
 
 	return cache, resourceTypes
 }
@@ -101,14 +79,16 @@ func main() {
 		log.Fatalf("Failed to create client: %v.", err)
 	}
 
+	// Don't write nginx conf when not in cluster
+	nginx.RunInMockMode = !(kube.RunningInCluster())
+
+	// Start nginx with the default configuration to start nginx as a daemon
+	nginx.StartServer(nginx.GetConf(config, router.NewCache()))
+
 	// Loop forever
 	for {
 		// Create the initial cache and watchers
 		cache, resourceTypes := initController(config, kubeClient)
-
-		nginx.GetConf(config, cache)
-
-		printCache(cache)
 
 		// List of events gathered during window
 		events := []Event{}
@@ -159,8 +139,7 @@ func main() {
 				//  If nginx needs restart
 				if needsRestart {
 					log.Println("Nginx needs restart.")
-					// TODO: Restart nginx
-					printCache(cache)
+					nginx.RestartServer(nginx.GetConf(config, cache), false)
 				}
 
 				// Clear events and reset the wait time for the event window

@@ -23,7 +23,7 @@ http {
   {{range $key, $upstream := .Upstreams}}
   # Upstream for {{$upstream.Path}} traffic on namespace {{$upstream.Namespace}}
   upstream {{$upstream.Name}} {
-    {{range $server := $upstream.Servers -}}
+    {{range $server := $upstream.Servers}}
     server {{$server.Target}};
     {{- end}}
   }
@@ -36,7 +36,7 @@ http {
 
     {{if $server.NeedsDefaultLocation -}}
     {{template "default-location" .}}
-    {{- end -}}
+    {{- end}}
 
     {{range $path, $location := $server.Locations -}}
     location {{$path}} {
