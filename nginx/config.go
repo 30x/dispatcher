@@ -15,30 +15,28 @@ import (
 
 const (
 	nginxConfTmpl = `
-events {
-  worker_connections 1024;
-}
+{{template "base-config" .}}
 
 http {
   {{template "http-preamble" .}}
 
-  {{range $key, $upstream := .Upstreams -}}
+  {{range $key, $upstream := .Upstreams}}
   # Upstream for {{$upstream.Path}} traffic on namespace {{$upstream.Namespace}}
   upstream {{$upstream.Name}} {
     {{range $server := $upstream.Servers -}}
     server {{$server.Target}};
     {{- end}}
   }
-  {{- end}}
+  {{end -}}
 
-  {{range $ns, $server := .Hosts -}}
+  {{range $ns, $server := .Hosts}}
   server {
     listen {{$.Config.Nginx.Port}};
-    server_name {{range $host, $opts := $server.HostNames -}} {{$host}}{{end}};
+    server_name{{range $host, $opts := $server.HostNames}} {{$host}}{{end}};
 
     {{if $server.NeedsDefaultLocation -}}
     {{template "default-location" .}}
-    {{- end}}
+    {{- end -}}
 
     {{range $path, $location := $server.Locations -}}
     location {{$path}} {
@@ -51,32 +49,39 @@ http {
       #Upstream {{$location.Upstream}}
       proxy_pass http://{{$location.Upstream}};
     }
-    {{- end}}
+
+    {{end}}
   }
-  {{- end}}
+  {{end}}
 
   {{template "default-server" .}}
 }
 `
 
 	partialsTmpl = `
-{{define "default-server"}}
+{{define "base-config" -}}
+events {
+  worker_connections 1024;
+}
+{{- end}}
+
+{{define "default-server" -}}
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
     return 444;
   }
-{{end}}
+{{- end}}
 
-{{define "default-location"}}
+{{define "default-location" -}}
     # Here to avoid returning the nginx welcome page for servers that do not have a "/" location.  (Issue #35)
     location / {
       return 404;
     }
-{{end}}
+{{- end}}
 
 
-{{define "http-preamble"}}
+{{define "http-preamble" -}}
   # http://nginx.org/en/docs/http/ngx_http_core_module.html
   types_hash_max_size 2048;
   server_names_hash_max_size 512;
@@ -102,7 +107,7 @@ http {
   proxy_set_header Connection $p_connection;
   proxy_set_header Host $http_host;
   proxy_set_header Upgrade $http_upgrade;
-{{end}}
+{{- end}}
 `
 )
 
@@ -265,8 +270,6 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 	if err := nginxTemplate.ExecuteTemplate(&doc, "nginx", tmplData); err != nil {
 		log.Fatalf("Failed to write template %v", err)
 	}
-
-	fmt.Println(doc.String())
 
 	return doc.String()
 }
