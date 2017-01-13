@@ -410,3 +410,37 @@ func TestGetConfCheckLocationNoDefaultLocation(t *testing.T) {
 		t.Fatalf("Config should not have a default location for server")
 	}
 }
+
+func TestGetConfCheckLocationTargetPath(t *testing.T) {
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+
+	targetPath := "/people"
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", TargetPath: &targetPath},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "location /users {") != 1 {
+		t.Fatalf("Expected location /users in config")
+	}
+
+	if strings.Count(doc, "proxy_pass http://upstream1694016776/people;") != 1 {
+		t.Fatalf("Expected proxy_pass to include /people")
+	}
+}

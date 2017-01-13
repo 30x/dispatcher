@@ -47,7 +47,7 @@ http {
       }
       {{- end}}
       #Upstream {{$location.Upstream}}
-      proxy_pass http://{{$location.Upstream}};
+      proxy_pass http://{{$location.Upstream}}{{if $location.TargetPath}}{{$location.TargetPath}}{{end}};
     }
 
     {{end}}
@@ -119,8 +119,9 @@ type hostT struct {
 }
 
 type locationT struct {
-	Path     string
-	Upstream string
+	Path       string
+	Upstream   string
+	TargetPath *string
 }
 
 type upstreamT struct {
@@ -228,11 +229,18 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 				host.NeedsDefaultLocation = false
 			}
 
-			_, ok := host.Locations[route.Incoming.Path]
+			location, ok := host.Locations[route.Incoming.Path]
 			if !ok {
 				host.Locations[route.Incoming.Path] = &locationT{
-					Path:     route.Incoming.Path,
-					Upstream: upstreamName,
+					Path:       route.Incoming.Path,
+					Upstream:   upstreamName,
+					TargetPath: route.Outgoing.TargetPath,
+				}
+			} else {
+				// Set targetPath for upstream if it's stil null
+				// Note: If pods have different target paths the last pod sets the target path.
+				if route.Outgoing.TargetPath != nil && location.TargetPath == nil {
+					location.TargetPath = route.Outgoing.TargetPath
 				}
 			}
 

@@ -161,7 +161,11 @@ func GetRoutes(config *Config, pod *api.Pod) []*Route {
 			continue
 		}
 
-		route := Route{&Incoming{Path: path.BasePath}, &Outgoing{IP: pod.Status.PodIP, Port: path.ContainerPort, TargetPath: path.TargetPath}}
+		route := Route{
+			&Incoming{Path: path.BasePath},
+			&Outgoing{IP: pod.Status.PodIP, Port: path.ContainerPort, TargetPath: path.TargetPath},
+		}
+
 		routes = append(routes, &route)
 	}
 
