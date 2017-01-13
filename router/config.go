@@ -108,9 +108,9 @@ func ConfigFromEnv() (*Config, error) {
 	// The name of the annotation used to find routing information
 	addConfig("PodsPathsAnnotation", "PATHS_ANNOTATION", "github.com/30x.dispatcher.paths")
 	// The name of the lable used to find app name of the pod
-	addConfig("PodAppNameLabel", "APP_NAME_LABEL", "github.com/30x.dispatcher.app.name")
-	// The name of the lable used to find app name of the pod
-	addConfig("PodAppRevLabel", "APP_REV_LABEL", "github.com/30x.dispatcher.app.rev")
+	addConfig("PodsAppNameLabel", "APP_NAME_LABEL", "github.com/30x.dispatcher.app.name")
+	// The name of the lable used to find app revision of the pod
+	addConfig("PodsAppRevLabel", "APP_REV_LABEL", "github.com/30x.dispatcher.app.rev")
 
 	// Nginx Configuration
 	//

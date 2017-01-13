@@ -36,10 +36,12 @@ type PodWatchableSet struct {
 PodWithRoutes contains a pod and its routes
 */
 type PodWithRoutes struct {
-	Name      string
-	Namespace string
-	Status    api.PodPhase
-	Routes    []*Route
+	Name        string
+	AppName     string
+	AppRevision string
+	Namespace   string
+	Status      api.PodPhase
+	Routes      []*Route
 	// Hash of annotation to quickly compare changes
 	hash uint64
 }
@@ -218,11 +220,13 @@ ConvertToModel takes in a k8s *api.Pod as a blank interface and converts it to a
 func (s PodWatchableSet) ConvertToModel(in interface{}) WatchableResource {
 	pod := in.(*api.Pod)
 	return &PodWithRoutes{
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-		Status:    pod.Status.Phase,
-		Routes:    GetRoutes(s.Config, pod),
-		hash:      calculatePodHash(s.Config, pod),
+		Name:        pod.Name,
+		AppName:     pod.Labels[s.Config.PodsAppNameLabel],
+		AppRevision: pod.Labels[s.Config.PodsAppRevLabel],
+		Namespace:   pod.Namespace,
+		Status:      pod.Status.Phase,
+		Routes:      GetRoutes(s.Config, pod),
+		hash:        calculatePodHash(s.Config, pod),
 	}
 }
 
@@ -292,7 +296,10 @@ func calculatePodHash(config *Config, pod *api.Pod) uint64 {
 	h.Write([]byte(pod.Namespace))
 	h.Write([]byte(pod.Status.Phase))
 	h.Write([]byte(pod.Name))
+	h.Write([]byte(pod.Labels[config.PodsAppNameLabel]))
+	h.Write([]byte(pod.Labels[config.PodsAppRevLabel]))
 	h.Write([]byte(pod.Status.PodIP))
+
 	// TODO: Add healthcheck to hash
 	return h.Sum64()
 }

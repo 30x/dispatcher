@@ -45,6 +45,8 @@ func genK8sPod(name, paths, ip string, status api.PodPhase, containerPorts []str
 			},
 			Labels: map[string]string{
 				"github.com/30x.dispatcher.routable": "true",
+				config.PodsAppNameLabel:              "some-app-name",
+				config.PodsAppRevLabel:               "1",
 			},
 		},
 		Spec: api.PodSpec{
@@ -465,6 +467,14 @@ func TestPodWatchableSetConvertToModel(t *testing.T) {
 
 	if pod.Status != api.PodRunning {
 		t.Fatalf("Pod Status should match %v but was %s", api.PodRunning, pod.Status)
+	}
+
+	if pod.AppName != "some-app-name" {
+		t.Fatalf("Pod.AppName should match \"some-app-name\" but was %s", pod.AppName)
+	}
+
+	if pod.AppRevision != "1" {
+		t.Fatalf("Pod.AppRevision should match \"1\" but was %s", pod.AppRevision)
 	}
 }
 
