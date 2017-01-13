@@ -178,7 +178,7 @@ Watch returns a k8s watch.Interface that subscribes to any pod changes
 func (s PodWatchableSet) Watch(resouceVersion string) (watch.Interface, error) {
 	// Get the list options so we can create the watch
 	watchOptions := api.ListOptions{
-		LabelSelector:   s.Config.PodsRoutableLabelSelector,
+		LabelSelector:   s.Config.RoutableLabelSelector,
 		ResourceVersion: resouceVersion,
 	}
 
@@ -197,7 +197,7 @@ Get returns a list of Namespace in the form of a WatchableResource interface and
 func (s PodWatchableSet) Get() ([]WatchableResource, string, error) {
 	// Query the initial list of Namespaces
 	k8sPods, err := s.KubeClient.Core().Pods(api.NamespaceAll).List(api.ListOptions{
-		LabelSelector: s.Config.PodsRoutableLabelSelector,
+		LabelSelector: s.Config.RoutableLabelSelector,
 	})
 	if err != nil {
 		return nil, "", err
@@ -232,7 +232,7 @@ Watchable tests where the *api.Pod has the routable label selector for the pod t
 func (s PodWatchableSet) Watchable(in interface{}) bool {
 	// TODO: add label.Selector on config to avoid parsing on every comparison
 	// Ignore err we've already checked in the config
-	selector, _ := labels.Parse(s.Config.PodsRoutableLabelSelector)
+	selector, _ := labels.Parse(s.Config.RoutableLabelSelector)
 	pod := in.(*api.Pod)
 	matched := selector.Matches(labels.Set(pod.Labels))
 	if !matched {

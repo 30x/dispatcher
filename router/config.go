@@ -28,20 +28,22 @@ type Config struct {
 	APIKeySecret string
 	// The secret data field name to store the API Key for the namespace
 	APIKeySecretDataField string
-	// The label selector used to identify routable namespaces
-	NamespaceRoutableLabelSelector string
+	// The label selector used to identify routable namespaces and pods
+	RoutableLabelSelector string
 	// The name of the annotation used to find hosts to route on the namespace
 	NamespaceHostsAnnotation string
-	// The name of the annotation used to find org name of namespace
-	NamespaceOrgAnnotation string
-	// The name of the annotation used to find env name of namespace
-	NamespaceEnvAnnotation string
+	// The name of the label used to find org name of namespace
+	NamespaceOrgLabel string
+	// The name of the label used to find env name of namespace
+	NamespaceEnvLabel string
 	// Nginx Specific configurations
 	Nginx NginxConfig
 	// The name of the annotation used to find routing information
 	PodsPathsAnnotation string
-	// The label selector used to identify routable objects
-	PodsRoutableLabelSelector string
+	// The name of the label used for applications name
+	PodsAppNameLabel string
+	// The name of the label used for applications revision
+	PodsAppRevLabel string
 }
 
 /*
@@ -56,6 +58,8 @@ type NginxConfig struct {
 	MaxClientBodySize string
 	// The port that nginx will listen on
 	Port int
+	// Default server return if request does not match any host, Defaults: 444
+	DefaultServerReturn string
 }
 
 // addConfig adds a default and env binding to viper
@@ -93,18 +97,20 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("APIKeySecret", "API_KEY_SECRET_NAME", "routing")
 	// The secret data field name to store the API Key for the namespace
 	addConfig("APIKeySecretDataField", "API_KEY_SECRET_FIELD", "api-key")
-	// The label selector used to identify routable namespaces
-	addConfig("NamespaceRoutableLabelSelector", "NAMESPACE_LABEL_SELECTOR", "github.com/30x.dispatcher.ns=true")
+	// The label selector used to identify routable namespaces and pods
+	addConfig("RoutableLabelSelector", "ROUTABLE_LABEL_SELECTOR", "github.com/30x.dispatcher.routable=true")
 	// The name of the annotation used to find hosts to route on the namespace
 	addConfig("NamespaceHostsAnnotation", "HOSTS_ANNOTATION", "github.com/30x.dispatcher.hosts")
-	// The name of the annotation used to find org name of namespace
-	addConfig("NamespaceOrgAnnotation", "ORG_ANNOTATION", "github.com/30x.dispatcher.org")
-	// The name of the annotation used to find env name of namespace
-	addConfig("NamespaceEnvAnnotation", "ENV_ANNOTATION", "github.com/30x.dispatcher.env")
-	// The label selector used to identify routable objects
-	addConfig("PodsRoutableLabelSelector", "ROUTABLE_LABEL_SELECTOR", "github.com/30x.dispatcher.routable=true")
+	// The name of the lable used to find org name of namespace
+	addConfig("NamespaceOrgLabel", "ORG_LABEL", "github.com/30x.dispatcher.org")
+	// The name of the lable used to find env name of namespace
+	addConfig("NamespaceEnvLabel", "ENV_LABEL", "github.com/30x.dispatcher.env")
 	// The name of the annotation used to find routing information
 	addConfig("PodsPathsAnnotation", "PATHS_ANNOTATION", "github.com/30x.dispatcher.paths")
+	// The name of the lable used to find app name of the pod
+	addConfig("PodAppNameLabel", "APP_NAME_LABEL", "github.com/30x.dispatcher.app.name")
+	// The name of the lable used to find app name of the pod
+	addConfig("PodAppRevLabel", "APP_REV_LABEL", "github.com/30x.dispatcher.app.rev")
 
 	// Nginx Configuration
 	//
@@ -116,6 +122,8 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.MaxClientBodySize", "NGINX_MAX_CLIENT_BODY_SIZE", "0")
 	// The port that nginx will listen on
 	addConfig("Nginx.Port", "PORT", "80")
+	// If request does not match any hosts nginx will return a status code or uri, defaults to 444
+	addConfig("Nginx.DefaultServerReturn", "DEFAULT_SERVER_RETURN", "444")
 
 	var config Config
 	err := viper.Unmarshal(&config)
@@ -126,8 +134,6 @@ func ConfigFromEnv() (*Config, error) {
 	// Validate annotations
 	for _, annotation := range []string{
 		config.NamespaceHostsAnnotation,
-		config.NamespaceOrgAnnotation,
-		config.NamespaceEnvAnnotation,
 		config.PodsPathsAnnotation,
 	} {
 		err = validateAnnotation(annotation)
@@ -143,8 +149,11 @@ func ConfigFromEnv() (*Config, error) {
 
 	// Validate label selectors
 	for _, selector := range []string{
-		config.NamespaceRoutableLabelSelector,
-		config.PodsRoutableLabelSelector,
+		config.RoutableLabelSelector,
+		config.NamespaceOrgLabel,
+		config.NamespaceEnvLabel,
+		config.PodsAppNameLabel,
+		config.PodsAppRevLabel,
 	} {
 		err = validateLabelSelector(selector)
 		if err != nil {

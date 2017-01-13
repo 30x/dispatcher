@@ -45,12 +45,12 @@ func genK8sNamespace(name, org, env, hosts string) api.Namespace {
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				config.NamespaceOrgAnnotation:   org,
-				config.NamespaceEnvAnnotation:   env,
 				config.NamespaceHostsAnnotation: hosts,
 			},
 			Labels: map[string]string{
-				"github.com/30x.dispatcher.ns": "true",
+				"github.com/30x.dispatcher.routable": "true",
+				config.NamespaceOrgLabel:             org,
+				config.NamespaceEnvLabel:             env,
 			},
 		},
 	}
@@ -158,12 +158,12 @@ func TestNamespaceWatchable(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "my-namespace",
 			Annotations: map[string]string{
-				config.NamespaceOrgAnnotation:   "org",
-				config.NamespaceEnvAnnotation:   "test",
 				config.NamespaceHostsAnnotation: genHostsJSON("org-test.ex.net api.ex.net"),
 			},
 			Labels: map[string]string{
-				"github.com/30x.dispatcher.ns": "false",
+				"github.com/30x.dispatcher.routable": "false",
+				config.NamespaceOrgLabel:             "org",
+				config.NamespaceEnvLabel:             "test",
 			},
 		},
 	}

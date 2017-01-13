@@ -73,7 +73,7 @@ Watch returns a k8s watch.Interface that subscribes to any namespace changes
 func (s NamespaceWatchableSet) Watch(resouceVersion string) (watch.Interface, error) {
 	// Get the list options so we can create the watch
 	namespacesWatchOptions := api.ListOptions{
-		LabelSelector:   s.Config.NamespaceRoutableLabelSelector,
+		LabelSelector:   s.Config.RoutableLabelSelector,
 		ResourceVersion: resouceVersion,
 	}
 
@@ -92,7 +92,7 @@ Get returns a list of Namespace in the form of a WatchableResource interface and
 func (s NamespaceWatchableSet) Get() ([]WatchableResource, string, error) {
 	// Query the initial list of Namespaces
 	k8sNamespaces, err := s.KubeClient.Core().Namespaces().List(api.ListOptions{
-		LabelSelector: s.Config.NamespaceRoutableLabelSelector,
+		LabelSelector: s.Config.RoutableLabelSelector,
 	})
 	if err != nil {
 		return nil, "", err
@@ -115,8 +115,8 @@ func (s NamespaceWatchableSet) ConvertToModel(in interface{}) WatchableResource 
 	ns := &Namespace{
 		Name:         namespace.Name,
 		Hosts:        getHostsFromNamespace(s.Config, namespace),
-		Organization: namespace.Annotations[s.Config.NamespaceOrgAnnotation],
-		Environment:  namespace.Annotations[s.Config.NamespaceEnvAnnotation],
+		Organization: namespace.Labels[s.Config.NamespaceOrgLabel],
+		Environment:  namespace.Labels[s.Config.NamespaceEnvLabel],
 		hash:         calculateNamespaceHash(s.Config, namespace),
 	}
 	return ns
@@ -128,7 +128,7 @@ Watchable tests where the *api.Namespace has the routable label selector for the
 func (s NamespaceWatchableSet) Watchable(in interface{}) bool {
 	// TODO: add label.Selector on config to avoid parsing on every comparison
 	// Ignore err we've already checked in the config
-	selector, _ := labels.Parse(s.Config.NamespaceRoutableLabelSelector)
+	selector, _ := labels.Parse(s.Config.RoutableLabelSelector)
 	namespace := in.(*api.Namespace)
 	return selector.Matches(labels.Set(namespace.Labels))
 }
@@ -220,7 +220,7 @@ func compileRegex(regexStr string) *regexp.Regexp {
 func calculateNamespaceHash(config *Config, ns *api.Namespace) uint64 {
 	h := fnv.New64()
 	h.Write([]byte(ns.Annotations[config.NamespaceHostsAnnotation]))
-	h.Write([]byte(ns.Annotations[config.NamespaceOrgAnnotation]))
-	h.Write([]byte(ns.Annotations[config.NamespaceEnvAnnotation]))
+	h.Write([]byte(ns.Labels[config.NamespaceOrgLabel]))
+	h.Write([]byte(ns.Labels[config.NamespaceEnvLabel]))
 	return h.Sum64()
 }

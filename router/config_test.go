@@ -8,8 +8,8 @@ import (
 func resetEnv() {
 	// Validate annotations
 	for _, name := range []string{
-		"NAMESPACE_LABEL_SELECTOR",
-		"ORG_ANNOTATION",
+		"ROUTABLE_LABEL_SELECTOR",
+		"HOSTS_ANNOTATION",
 		"PORT",
 	} {
 		os.Unsetenv(name)
@@ -21,7 +21,7 @@ Test for ConfigFromEnv should throw error on invalid label selector
 */
 func TestConfigFromEnvInvailidLabelSelector(t *testing.T) {
 	resetEnv()
-	os.Setenv("NAMESPACE_LABEL_SELECTOR", "...invalid selector")
+	os.Setenv("ROUTABLE_LABEL_SELECTOR", "...invalid selector")
 	_, err := ConfigFromEnv()
 	if err == nil {
 		t.Fatal("Error should not nil")
@@ -33,7 +33,7 @@ Test for ConfigFromEnv should throw error on invalid annotation
 */
 func TestConfigFromEnvInvailidAnnotation(t *testing.T) {
 	resetEnv()
-	os.Setenv("ORG_ANNOTATION", "...")
+	os.Setenv("HOSTS_ANNOTATION", "...")
 	_, err := ConfigFromEnv()
 	if err == nil {
 		t.Fatal("Error should not nil")

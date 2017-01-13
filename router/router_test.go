@@ -131,12 +131,12 @@ func TestProcessEventResourceModifiedChangedUnWatchable(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "my-namespace",
 			Annotations: map[string]string{
-				config.NamespaceOrgAnnotation:   "org",
-				config.NamespaceEnvAnnotation:   "test",
 				config.NamespaceHostsAnnotation: genHostsJSON("org-test.ex.net api.ex.net"),
 			},
 			Labels: map[string]string{
-				"github.com/30x.dispatcher.ns": "false",
+				"github.com/30x.dispatcher.routable": "false",
+				config.NamespaceOrgLabel:             "org",
+				config.NamespaceEnvLabel:             "test",
 			},
 		},
 	}
