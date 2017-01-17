@@ -28,16 +28,17 @@ func resetConf() {
 }
 
 func getConfig() templateDataT {
-	resetConf()
 	return templateDataT{
-		APIKeyHeader: nginxAPIKeyHeader,
-		Hosts:        make(map[string]*hostT),
-		Upstreams:    make(map[string]*upstreamT),
-		Config:       config,
+		APIKeyHeader:        nginxAPIKeyHeader,
+		DefaultServerReturn: defaultServerReturnFromConfig(config),
+		Hosts:               make(map[string]*hostT),
+		Upstreams:           make(map[string]*upstreamT),
+		Config:              config,
 	}
 }
 
 func TestPartialDefaultServer(t *testing.T) {
+	resetConf()
 	tmplData := getConfig()
 	// Set nginx port to custom value
 	tmplData.Config.Nginx.Port = 1234
@@ -57,11 +58,34 @@ func TestPartialDefaultServer(t *testing.T) {
 		t.Fatalf("Expected default server to only return 444;")
 	}
 
-	// TODO: Make test return 444 when it's configurable to a target
+	config.Nginx.DefaultServerReturn = "200"
+	tmplData = getConfig()
+
+	var doc2 bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc2, "default-server", tmplData); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if idx := strings.Index(doc2.String(), "return 200;"); idx < 0 {
+		t.Fatalf("Expected default server to only return 200;")
+	}
+
+	config.Nginx.DefaultServerReturn = "http://1.2.3.4/default"
+	tmplData = getConfig()
+
+	var doc3 bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc3, "default-server", tmplData); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if idx := strings.Index(doc3.String(), "proxy_pass http://1.2.3.4/default;"); idx < 0 {
+		t.Fatalf("Expected default server to proxy to http://1.2.3.4/default;")
+	}
 
 }
 
 func TestPartialBaseConfig(t *testing.T) {
+	resetConf()
 	tmplData := getConfig()
 
 	var doc bytes.Buffer
@@ -80,6 +104,7 @@ func TestPartialBaseConfig(t *testing.T) {
 }
 
 func TestPartialDefaultLocation(t *testing.T) {
+	resetConf()
 	tmplData := getConfig()
 
 	var doc bytes.Buffer
@@ -99,7 +124,7 @@ func TestPartialDefaultLocation(t *testing.T) {
 }
 
 func TestPartialHttpPreamble(t *testing.T) {
-
+	resetConf()
 	tmplData := getConfig()
 
 	var doc bytes.Buffer
@@ -141,6 +166,7 @@ func TestPartialHttpPreamble(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+	resetConf()
 	tmplData := getConfig()
 
 	var doc bytes.Buffer
@@ -186,6 +212,7 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestGetConfNoPodsOnlyNamespace(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{
@@ -228,6 +255,7 @@ func TestGetConfNoPodsOnlyNamespace(t *testing.T) {
 }
 
 func TestGetConfCheckUpstreams(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{
@@ -269,6 +297,7 @@ func TestGetConfCheckUpstreams(t *testing.T) {
 }
 
 func TestGetConfCheckLocationNoSecret(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{
@@ -312,6 +341,7 @@ func TestGetConfCheckLocationNoSecret(t *testing.T) {
 }
 
 func TestGetConfCheckLocationWithSecret(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{
@@ -361,6 +391,7 @@ func TestGetConfCheckLocationWithSecret(t *testing.T) {
 }
 
 func TestGetConfCheckLocationNoDefaultLocation(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{
@@ -412,6 +443,7 @@ func TestGetConfCheckLocationNoDefaultLocation(t *testing.T) {
 }
 
 func TestGetConfCheckLocationTargetPath(t *testing.T) {
+	resetConf()
 	cache := router.NewCache()
 
 	cache.Namespaces["test-namespace"] = &router.Namespace{

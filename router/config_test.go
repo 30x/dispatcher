@@ -10,6 +10,7 @@ func resetEnv() {
 	for _, name := range []string{
 		"ROUTABLE_LABEL_SELECTOR",
 		"HOSTS_ANNOTATION",
+		"DEFAULT_SERVER_RETURN",
 		"PORT",
 	} {
 		os.Unsetenv(name)
@@ -67,4 +68,16 @@ func TestConfigFromEnv(t *testing.T) {
 		t.Fatalf("Expected port to be 12345 was %d", config.Nginx.Port)
 	}
 
+}
+
+/*
+Test for ConfigFromEnv should throw error on invalid default server return status code
+*/
+func TestConfigFromEnvInvailidDefaultServerReturnCode(t *testing.T) {
+	resetEnv()
+	os.Setenv("DEFAULT_SERVER_RETURN", "-1")
+	_, err := ConfigFromEnv()
+	if err == nil {
+		t.Fatal("Error should not nil")
+	}
 }

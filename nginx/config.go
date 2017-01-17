@@ -9,6 +9,7 @@ import (
 	"log"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -69,7 +70,7 @@ events {
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
-    return 444;
+    {{.DefaultServerReturn}}
   }
 {{- end}}
 
@@ -137,10 +138,11 @@ type serverT struct {
 }
 
 type templateDataT struct {
-	APIKeyHeader string
-	Hosts        map[string]*hostT
-	Upstreams    map[string]*upstreamT
-	Config       *router.Config
+	APIKeyHeader        string
+	DefaultServerReturn string
+	Hosts               map[string]*hostT
+	Upstreams           map[string]*upstreamT
+	Config              *router.Config
 }
 
 type serversT []*serverT
@@ -171,6 +173,17 @@ func init() {
 	}
 }
 
+func defaultServerReturnFromConfig(config *router.Config) string {
+	code, err := strconv.Atoi(config.Nginx.DefaultServerReturn)
+	if err == nil {
+		// use as return code
+		return fmt.Sprintf("return %d;", code)
+	}
+
+	// string use as upstream
+	return fmt.Sprintf("proxy_pass %s;", config.Nginx.DefaultServerReturn)
+}
+
 /*
 GetConf takes the router cache and returns a generated nginx configuration
 */
@@ -180,10 +193,11 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 	convertAPIKeyHeaderForNginx(config)
 
 	tmplData := templateDataT{
-		APIKeyHeader: nginxAPIKeyHeader,
-		Hosts:        make(map[string]*hostT),
-		Upstreams:    make(map[string]*upstreamT),
-		Config:       config,
+		APIKeyHeader:        nginxAPIKeyHeader,
+		Hosts:               make(map[string]*hostT),
+		Upstreams:           make(map[string]*upstreamT),
+		Config:              config,
+		DefaultServerReturn: defaultServerReturnFromConfig(config),
 	}
 
 	// Create hosts from Namespaces

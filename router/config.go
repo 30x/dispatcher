@@ -2,6 +2,8 @@ package router
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/30x/dispatcher/utils"
@@ -18,6 +20,9 @@ const (
 	ErrMsgTmplInvalidLabelSelector = "has an invalid label selector: %s $v\n"
 	// ErrMsgTmplInvalidPort is the error message template for an invalid port
 	ErrMsgTmplInvalidPort = "%s is an invalid port\n"
+	// ErrMsgTmplInvalidHttpStatusCode is the erro message template for invalid status code
+	ErrMsgTmplInvalidServerReturnHttpStatusCode = "%d is an invalid status code 100-999 for default server return"
+	ErrMsgTmplInvalidServerReturnUrl            = "%s is an invalid url for default server return %v"
 )
 
 /*
@@ -158,6 +163,21 @@ func ConfigFromEnv() (*Config, error) {
 		err = validateLabelSelector(selector)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	// Validate default server return can either be a http status code or valid url
+	code, err := strconv.Atoi(config.Nginx.DefaultServerReturn)
+	if err != nil {
+		// check for valid url
+		u, err := url.Parse(config.Nginx.DefaultServerReturn)
+		fmt.Println(config.Nginx.DefaultServerReturn, err, u)
+		if err != nil {
+			return nil, fmt.Errorf(ErrMsgTmplInvalidServerReturnUrl, config.Nginx.DefaultServerReturn, err)
+		}
+	} else {
+		if code < 100 || code > 999 {
+			return nil, fmt.Errorf(ErrMsgTmplInvalidServerReturnHttpStatusCode, code)
 		}
 	}
 
