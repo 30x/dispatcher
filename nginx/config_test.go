@@ -29,11 +29,11 @@ func resetConf() {
 
 func getConfig() templateDataT {
 	return templateDataT{
-		APIKeyHeader:        nginxAPIKeyHeader,
-		DefaultServerReturn: defaultServerReturnFromConfig(config),
-		Hosts:               make(map[string]*hostT),
-		Upstreams:           make(map[string]*upstreamT),
-		Config:              config,
+		APIKeyHeader:          nginxAPIKeyHeader,
+		DefaultLocationReturn: defaultReturnFromConfig(config),
+		Hosts:     make(map[string]*hostT),
+		Upstreams: make(map[string]*upstreamT),
+		Config:    config,
 	}
 }
 
@@ -57,31 +57,6 @@ func TestPartialDefaultServer(t *testing.T) {
 	if idx := strings.Index(doc.String(), "return 444;"); idx < 0 {
 		t.Fatalf("Expected default server to only return 444;")
 	}
-
-	config.Nginx.DefaultServerReturn = "200"
-	tmplData = getConfig()
-
-	var doc2 bytes.Buffer
-	if err := nginxTemplate.ExecuteTemplate(&doc2, "default-server", tmplData); err != nil {
-		t.Fatalf("Failed to write template %v", err)
-	}
-
-	if idx := strings.Index(doc2.String(), "return 200;"); idx < 0 {
-		t.Fatalf("Expected default server to only return 200;")
-	}
-
-	config.Nginx.DefaultServerReturn = "http://1.2.3.4/default"
-	tmplData = getConfig()
-
-	var doc3 bytes.Buffer
-	if err := nginxTemplate.ExecuteTemplate(&doc3, "default-server", tmplData); err != nil {
-		t.Fatalf("Failed to write template %v", err)
-	}
-
-	if idx := strings.Index(doc3.String(), "proxy_pass http://1.2.3.4/default;"); idx < 0 {
-		t.Fatalf("Expected default server to proxy to http://1.2.3.4/default;")
-	}
-
 }
 
 func TestPartialBaseConfig(t *testing.T) {
@@ -120,6 +95,30 @@ func TestPartialDefaultLocation(t *testing.T) {
 
 	if doc.String() != expected {
 		t.Fatalf("Default location does not match expected")
+	}
+
+	config.Nginx.DefaultLocationReturn = "200"
+	tmplData = getConfig()
+
+	var doc2 bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc2, "default-location", tmplData); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if idx := strings.Index(doc2.String(), "return 200;"); idx < 0 {
+		t.Fatalf("Expected default location to only return 200;")
+	}
+
+	config.Nginx.DefaultLocationReturn = "http://1.2.3.4/default"
+	tmplData = getConfig()
+
+	var doc3 bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc3, "default-location", tmplData); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if idx := strings.Index(doc3.String(), "proxy_pass http://1.2.3.4/default;"); idx < 0 {
+		t.Fatalf("Expected default location to proxy to http://1.2.3.4/default;")
 	}
 }
 

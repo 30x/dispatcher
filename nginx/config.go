@@ -36,7 +36,7 @@ http {
     server_name{{range $host, $opts := $server.HostNames}} {{$host}}{{end}};
 
     {{if $server.NeedsDefaultLocation -}}
-    {{template "default-location" .}}
+    {{template "default-location" $}}
     {{- end}}
 
     {{range $path, $location := $server.Locations -}}
@@ -70,14 +70,14 @@ events {
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
-    {{.DefaultServerReturn}}
+    return 444;
   }
 {{- end}}
 
 {{define "default-location" -}}
     # Here to avoid returning the nginx welcome page for servers that do not have a "/" location.  (Issue #35)
     location / {
-      return 404;
+      {{.DefaultLocationReturn}}
     }
 {{- end}}
 
@@ -138,11 +138,11 @@ type serverT struct {
 }
 
 type templateDataT struct {
-	APIKeyHeader        string
-	DefaultServerReturn string
-	Hosts               map[string]*hostT
-	Upstreams           map[string]*upstreamT
-	Config              *router.Config
+	APIKeyHeader          string
+	DefaultLocationReturn string
+	Hosts                 map[string]*hostT
+	Upstreams             map[string]*upstreamT
+	Config                *router.Config
 }
 
 type serversT []*serverT
@@ -173,15 +173,15 @@ func init() {
 	}
 }
 
-func defaultServerReturnFromConfig(config *router.Config) string {
-	code, err := strconv.Atoi(config.Nginx.DefaultServerReturn)
+func defaultReturnFromConfig(config *router.Config) string {
+	code, err := strconv.Atoi(config.Nginx.DefaultLocationReturn)
 	if err == nil {
 		// use as return code
 		return fmt.Sprintf("return %d;", code)
 	}
 
 	// string use as upstream
-	return fmt.Sprintf("proxy_pass %s;", config.Nginx.DefaultServerReturn)
+	return fmt.Sprintf("proxy_pass %s;", config.Nginx.DefaultLocationReturn)
 }
 
 /*
@@ -193,11 +193,11 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 	convertAPIKeyHeaderForNginx(config)
 
 	tmplData := templateDataT{
-		APIKeyHeader:        nginxAPIKeyHeader,
-		Hosts:               make(map[string]*hostT),
-		Upstreams:           make(map[string]*upstreamT),
-		Config:              config,
-		DefaultServerReturn: defaultServerReturnFromConfig(config),
+		APIKeyHeader:          nginxAPIKeyHeader,
+		Hosts:                 make(map[string]*hostT),
+		Upstreams:             make(map[string]*upstreamT),
+		Config:                config,
+		DefaultLocationReturn: defaultReturnFromConfig(config),
 	}
 
 	// Create hosts from Namespaces

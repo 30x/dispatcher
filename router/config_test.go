@@ -75,7 +75,7 @@ Test for ConfigFromEnv should throw error on invalid default server return statu
 */
 func TestConfigFromEnvInvailidDefaultServerReturnCode(t *testing.T) {
 	resetEnv()
-	os.Setenv("DEFAULT_SERVER_RETURN", "-1")
+	os.Setenv("DEFAULT_LOCATION_RETURN", "-1")
 	_, err := ConfigFromEnv()
 	if err == nil {
 		t.Fatal("Error should not nil")

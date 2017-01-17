@@ -64,8 +64,8 @@ type NginxConfig struct {
 	MaxClientBodySize string
 	// The port that nginx will listen on
 	Port int
-	// Default server return if request does not match any host, Defaults: 444
-	DefaultServerReturn string
+	// Default location return if request does not match any patjs, Defaults: 404
+	DefaultLocationReturn string
 }
 
 // addConfig adds a default and env binding to viper
@@ -128,8 +128,8 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.MaxClientBodySize", "NGINX_MAX_CLIENT_BODY_SIZE", "0")
 	// The port that nginx will listen on
 	addConfig("Nginx.Port", "PORT", "80")
-	// If request does not match any hosts nginx will return a status code or uri, defaults to 444
-	addConfig("Nginx.DefaultServerReturn", "DEFAULT_SERVER_RETURN", "444")
+	// If request does not match any paths nginx will return a status code or uri, defaults to 404
+	addConfig("Nginx.DefaultLocationReturn", "DEFAULT_LOCATION_RETURN", "404")
 
 	var config Config
 	err := viper.Unmarshal(&config)
@@ -168,13 +168,12 @@ func ConfigFromEnv() (*Config, error) {
 	}
 
 	// Validate default server return can either be a http status code or valid url
-	code, err := strconv.Atoi(config.Nginx.DefaultServerReturn)
+	code, err := strconv.Atoi(config.Nginx.DefaultLocationReturn)
 	if err != nil {
 		// check for valid url
-		u, err := url.Parse(config.Nginx.DefaultServerReturn)
-		fmt.Println(config.Nginx.DefaultServerReturn, err, u)
+		_, err := url.Parse(config.Nginx.DefaultLocationReturn)
 		if err != nil {
-			return nil, fmt.Errorf(ErrMsgTmplInvalidServerReturnURL, config.Nginx.DefaultServerReturn, err)
+			return nil, fmt.Errorf(ErrMsgTmplInvalidServerReturnURL, config.Nginx.DefaultLocationReturn, err)
 		}
 	} else {
 		if code < 100 || code > 999 {
