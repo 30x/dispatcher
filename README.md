@@ -67,7 +67,7 @@ to use the events for as quick a turnaround as possible.)_  Events are processed
 Each Pod can expose one or more services by using one or more entries in the `github.com/30x.dispatcher.paths` annotation. All of the
 paths exposed via `github.com/30x.dispatcher.paths` are exposed for each of the hosts listed in the `github.com/30x.dispatcher.hosts` 
 annotation of its corresponding Namespace.  _(So if you have a traffic Hosts of `host1 host2` and a `github.com/30x.dispatcher.path` of 
-`[{"targetPath": "/", "containerPort": "80"},{"targetPath": "/nodejs", "containerPort": "3000"}]`, you would have 4 separate nginx location
+`[{"basePath": "/", "containerPort": "80"},{"basePath": "/nodejs", "containerPort": "3000"}]`, you would have 4 separate nginx location
  blocks: `host1/ -> {PodIP}:80`, `host2/ -> {PodIP}:80`, `host1/nodejs -> {PodIP}:3000` and `host2/nodejs -> {PodIP}:3000` 
  Right now there is no way to associate specific paths to specific hosts but it may be something we support in the future.)_
 
