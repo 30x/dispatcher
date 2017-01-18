@@ -70,7 +70,8 @@ func TestPartialBaseConfig(t *testing.T) {
 	}
 
 	expected := `events {
-  worker_connections 1024;
+  worker_connections  81920;
+  multi_accept        on;
 }`
 
 	if doc.String() != expected {
