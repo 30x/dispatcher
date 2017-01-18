@@ -66,7 +66,7 @@ to use the events for as quick a turnaround as possible.)_  Events are processed
 
 Each Pod can expose one or more services by using one or more entries in the `github.com/30x.dispatcher.paths` annotation. All of the
 paths exposed via `github.com/30x.dispatcher.paths` are exposed for each of the hosts listed in the `github.com/30x.dispatcher.hosts` 
-annotation of it's corrisponding Namespace.  _(So if you have a traffic Hosts of `host1 host2` and a `github.com/30x.dispatcher.path` of 
+annotation of its corresponding Namespace.  _(So if you have a traffic Hosts of `host1 host2` and a `github.com/30x.dispatcher.path` of 
 `[{"targetPath": "/", "containerPort": "80"},{"targetPath": "/nodejs", "containerPort": "3000"}]`, you would have 4 separate nginx location
  blocks: `host1/ -> {PodIP}:80`, `host2/ -> {PodIP}:80`, `host1/nodejs -> {PodIP}:3000` and `host2/nodejs -> {PodIP}:3000` 
  Right now there is no way to associate specific paths to specific hosts but it may be something we support in the future.)_
@@ -78,11 +78,11 @@ All of the touch points for this router are configurable via environment variabl
 General Configuration:
 * `API_KEY_SECRET_NAME`: This is the Secret name of the API Key to use to secure communication to your Pods. Default: _(`routing`)_
 * `API_KEY_SECRET_FIELD`: This is the Secret fieldname of the API Key to use to secure communication to your Pods. Default: _(`api-key`)_
-* `APP_NAME_LABEL`: This is the label name used to store the applications name. _(Default: `github.com/30x.dispatcher.app.name`)_
-* `APP_REV_LABEL`: This is the label name used to store the applications revision. _(Default: `github.com/30x.dispatcher.app.rev`)_
-* `ENV_LABEL`: This is the label name used to store the Namespaces environment. _(Default: `github.com/30x.dispatcher.env`)_
+* `APP_NAME_LABEL`: This is the label name used to store the application's name. _(Default: `github.com/30x.dispatcher.app.name`)_
+* `APP_REV_LABEL`: This is the label name used to store the application's revision. _(Default: `github.com/30x.dispatcher.app.rev`)_
+* `ENV_LABEL`: This is the label name used to store the Namespace's environment. _(Default: `github.com/30x.dispatcher.env`)_
 * `HOSTS_ANNOTATION`: This is the annotation name used to store the JSON Document for the configured hosts of a Namespace. _(Default: `github.com/30x.dispatcher.hosts`)_
-* `ORG_LABEL`: This is the label name used to store the Namespaces organization. _(Default: `github.com/30x.dispatcher.org`)_
+* `ORG_LABEL`: This is the label name used to store the Namespace's organization. _(Default: `github.com/30x.dispatcher.org`)_
 * `PATHS_ANNOTATION`: This is the annotation name used to store the JSON array of routing path configurations for your Pods _(Default: `github.com/30x.dispatcher.paths`)_
 * `ROUTABLE_LABEL_SELECTOR`: This is the [label selector](http://kubernetes.io/docs/user-guide/labels/#label-selectors) used to identify Namepaces and Pods that are marked for routing _(Default: `github.com/30x.dispatcher.routable=true`)_
 
@@ -97,7 +97,7 @@ Nginx Configuration:
 
 While most routers will perform routing only, we have added a very simple mechanism to do API Key based authorization
 at the router level.  Why might you want this?  Imagine you've got multi-tenancy in Kubernetes where each namespace is
-specific to a single tentant.  To avoid a Pod in namespace `X` configuring itself to receive traffic from namespace `Y`,
+specific to a single tenant.  To avoid a Pod in namespace `X` configuring itself to receive traffic from namespace `Y`,
 this router allows you to create a specially named secret _(`routing` in this case)_ with a specially named data field
 _(`api-key`)_ and the value stored in this secret will be used to secure traffic to all Pods in your namespace wired up
 for routing.  To do this, nginx is configured to ensure that all requests routed to your Pod have the
@@ -116,7 +116,7 @@ Based on the example, any routes that points to Pods in the `my-namespace` names
 provide this header.
 
 **Note:** This feature is written assuming that each combination of `github.com/30x.dispatcher.hosts` and `github.com/30x.dispatcher.paths` will only be
-configured such that the Pods servicing the traffice are from a single namespace.  Once you start allowing pods from
+configured such that the Pods servicing the traffic are from a single namespace.  Once you start allowing pods from
 multiple namespaces to consume traffic for the same host and path combination, this falls apart.  While the routing will
 work fine in this situation, the router's API Key is namespace specific and the first seen API Key is the one that is
 used.
@@ -468,8 +468,8 @@ spec:
             value: "81"
 ```
 
-Based on this deployment, we have an ingress that serves `publicHosts` and `publicPaths` combinations and an internal
-router that serves `privateHosts` and `privatePaths` combinations.  With this being the case, let's take our example
+Based on this deployment, we have an ingress that serves `github.com/30x.dispatcher.hosts.public` and `github.com/30x.dispatcher.paths.public` combinations and an internal
+router that serves `github.com/30x.dispatcher.hosts.private` and `github.com/30x.dispatcher.paths.private` combinations.  With this being the case, let's take our example
 Node.js application deployed above and lets deploy a variant over it that has both public and private paths:
 
 ``` yaml
