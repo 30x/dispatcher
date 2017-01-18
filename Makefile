@@ -25,4 +25,19 @@ build-for-container: main.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o dispatcher .
 
 build-image: build-for-container
-	docker build -t dispatcher --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	docker build -t thirtyx/dispatcher --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+
+coverage-router:
+	go test -coverprofile=router-coverage.out ./router
+	go tool cover -html=router-coverage.out
+coverage-nginx:
+	go test -coverprofile=nginx-coverage.out ./nginx
+	go tool cover -html=nginx-coverage.out
+coverage-kubernetes:
+	go test -coverprofile=kubernetes-coverage.out ./kubernetes
+	go tool cover -html=kubernetes-coverage.out
+coverage-utils:
+	go test -coverprofile=utils-coverage.out ./utils
+	go tool cover -html=utils-coverage.out
+
+coverage: coverage-router coverage-nginx coverage-kubernetes coverage-utils

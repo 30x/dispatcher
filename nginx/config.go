@@ -30,20 +30,17 @@ http {
   }
   {{end -}}
 
-  {{range $ns, $server := .Hosts}}
+  {{range $host, $server := .Hosts}}
   server {
     listen {{$.Config.Nginx.Port}};
-    server_name{{range $host, $opts := $server.HostNames}} {{$host}}{{end}};
-
-    {{if $server.NeedsDefaultLocation -}}
-    {{template "default-location" $}}
-    {{- end}}
+    server_name {{$host}};
+    {{if $server.NeedsDefaultLocation -}} {{template "default-location" $}}{{- end}}
 
     {{range $path, $location := $server.Locations -}}
     location {{$path}} {
-      {{if ne $server.Secret "" -}}
-      # Check the Routing API Key (namespace: {{$ns}})
-      if ($http_{{$.APIKeyHeader}} != "{{$server.Secret}}") {
+      {{if ne $location.Secret "" -}}
+      # Check the Routing API Key (namespace: {{$location.Namespace}})
+      if ($http_{{$.APIKeyHeader}} != "{{$location.Secret}}") {
         return 403;
       }
       {{- end}}
@@ -113,15 +110,16 @@ events {
 )
 
 type hostT struct {
-	HostNames            map[string]*router.HostOptions
+	HostOptions          *router.HostOptions
 	Locations            map[string]*locationT
-	Secret               string
 	NeedsDefaultLocation bool
 }
 
 type locationT struct {
+	Namespace  string
 	Path       string
 	Upstream   string
+	Secret     string
 	TargetPath *string
 }
 
@@ -200,87 +198,114 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 		DefaultLocationReturn: defaultReturnFromConfig(config),
 	}
 
-	// Create hosts from Namespaces
+	// Create hostT for each host in each Namespace
 	for _, ns := range cache.Namespaces {
-		var locationSecret string
-		secret, ok := cache.Secrets[ns.Name]
-		if ok {
-			// There is guaranteed to be an API Key so no need to double check
-			locationSecret = base64.StdEncoding.EncodeToString(secret.Data)
-		}
-
-		host := hostT{
-			HostNames:            make(map[string]*router.HostOptions),
-			Locations:            make(map[string]*locationT),
-			Secret:               locationSecret,
-			NeedsDefaultLocation: true,
-		}
-
 		for hostName, opts := range ns.Hosts {
-			host.HostNames[hostName] = &opts
+			// If hostT does not exist for hostname create one.
+			if _, ok := tmplData.Hosts[hostName]; !ok {
+				tmplData.Hosts[hostName] = &hostT{
+					HostOptions:          &opts,
+					Locations:            make(map[string]*locationT),
+					NeedsDefaultLocation: true,
+				}
+			} else {
+				// Multiple namespace use the same host.
+				// TODO: In the future merge hostOptions
+			}
 		}
-		tmplData.Hosts[ns.Name] = &host
 	}
 
 	// Generate upstreams
 	for _, pod := range cache.Pods {
-		host, ok := tmplData.Hosts[pod.Namespace]
+		podNs, ok := cache.Namespaces[pod.Namespace]
 		if !ok {
-			log.Printf("  Nginx Config: Missing host/namespace for pod %s\n", pod.Name)
+			log.Printf("  Nginx Config: Missing namespace (%s) for pod %s\n", pod.Namespace, pod.Name)
+			continue
 		}
 
-		for _, route := range pod.Routes {
-			upstreamKey := pod.Namespace + route.Incoming.Path
-			upstreamHash := fmt.Sprint(hash(upstreamKey))
-			upstreamName := "upstream" + upstreamHash
-			target := route.Outgoing.IP
-			if route.Outgoing.Port != "80" && route.Outgoing.Port != "443" {
-				target += ":" + route.Outgoing.Port
-			}
+		for hostName := range podNs.Hosts {
+			// Host always exists we just created it above
+			host, _ := tmplData.Hosts[hostName]
 
-			// Unset the need for a default location if necessary
-			if host.NeedsDefaultLocation && route.Incoming.Path == "/" {
-				host.NeedsDefaultLocation = false
-			}
-
-			location, ok := host.Locations[route.Incoming.Path]
-			if !ok {
-				host.Locations[route.Incoming.Path] = &locationT{
-					Path:       route.Incoming.Path,
-					Upstream:   upstreamName,
-					TargetPath: route.Outgoing.TargetPath,
+			for _, route := range pod.Routes {
+				upstreamKey := hostName + route.Incoming.Path
+				upstreamHash := fmt.Sprint(hash(upstreamKey))
+				upstreamName := "upstream" + upstreamHash
+				target := route.Outgoing.IP
+				if route.Outgoing.Port != "80" && route.Outgoing.Port != "443" {
+					target += ":" + route.Outgoing.Port
 				}
-			} else {
-				// Set targetPath for upstream if it's stil null
-				// Note: If pods have different target paths the last pod sets the target path.
-				if route.Outgoing.TargetPath != nil && location.TargetPath == nil {
-					location.TargetPath = route.Outgoing.TargetPath
+
+				// Unset the need for a default location if necessary
+				if host.NeedsDefaultLocation && route.Incoming.Path == "/" {
+					host.NeedsDefaultLocation = false
 				}
-			}
 
-			// Create or add to the upstreams
-			if upstream, ok := tmplData.Upstreams[upstreamKey]; ok {
-				// Upsteam already created
-				upstream.Servers = append(upstream.Servers, &serverT{
-					Pod:    pod,
-					Target: target,
-				})
+				location, ok := host.Locations[route.Incoming.Path]
+				if !ok {
+					// Calculate secret for location
+					var locationSecret string
+					secret, ok := cache.Secrets[pod.Namespace]
+					if ok {
+						// Guaranteed to be an API Key so no need to double check
+						locationSecret = base64.StdEncoding.EncodeToString(secret.Data)
+					}
 
-				// Sort to make finding your pods in an upstream easier
-				sort.Sort(upstream.Servers)
-			} else {
-				// Create new upstream
-				tmplData.Upstreams[upstreamKey] = &upstreamT{
-					Name:      upstreamName,
-					Namespace: pod.Namespace,
-					Path:      route.Incoming.Path,
-					Servers: []*serverT{
-						&serverT{
-							Pod:    pod,
-							Target: target,
+					host.Locations[route.Incoming.Path] = &locationT{
+						Namespace:  pod.Namespace,
+						Secret:     locationSecret,
+						Path:       route.Incoming.Path,
+						Upstream:   upstreamName,
+						TargetPath: route.Outgoing.TargetPath,
+					}
+				} else {
+					// Location already exists
+
+					// Check if location is in the same namespace
+					if location.Namespace != pod.Namespace {
+						log.Printf("  Nginx Config: Duplicate hostname and path for namespace:%s path:%s pod %s in namespace %s is duplicate.\n", location.Namespace, location.Path, pod.Name, pod.Namespace)
+						// TODO: Better logging / handling of mis configuration
+
+						// We cann't add pod host/path combitation if in different namespaces because secrets are per namespace
+						// Move on to next route.
+						continue
+					}
+
+					// Set targetPath for upstream if it's stil null
+					// Note: If pods have different target paths the last pod sets the target path.
+					if route.Outgoing.TargetPath != nil && location.TargetPath == nil {
+						log.Printf("  Nginx Config: Inconsistent targetPath for pods for host:%s and path:%s new targetPath will be %s was nil\n", hostName, route.Incoming.Path, *route.Outgoing.TargetPath)
+						location.TargetPath = route.Outgoing.TargetPath
+					} else if location.TargetPath != nil && route.Outgoing.TargetPath != nil && *route.Outgoing.TargetPath != *location.TargetPath {
+						log.Printf("  Nginx Config: Inconsistent targetPath for pods for host:%s and path:%s %s != %s\n", hostName, route.Incoming.Path, *route.Outgoing.TargetPath, *location.TargetPath)
+					}
+				}
+
+				// Create or add to the upstreams
+				if upstream, ok := tmplData.Upstreams[upstreamKey]; ok {
+					// Upsteam already created
+					upstream.Servers = append(upstream.Servers, &serverT{
+						Pod:    pod,
+						Target: target,
+					})
+
+					// Sort to make finding your pods in an upstream easier
+					sort.Sort(upstream.Servers)
+				} else {
+					// Create new upstream
+					tmplData.Upstreams[upstreamKey] = &upstreamT{
+						Name:      upstreamName,
+						Namespace: pod.Namespace,
+						Path:      route.Incoming.Path,
+						Servers: []*serverT{
+							&serverT{
+								Pod:    pod,
+								Target: target,
+							},
 						},
-					},
+					}
 				}
+
 			}
 
 		}

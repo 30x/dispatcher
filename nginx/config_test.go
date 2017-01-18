@@ -230,16 +230,20 @@ func TestGetConfNoPodsOnlyNamespace(t *testing.T) {
 
 	doc := GetConf(config, cache)
 
-	if strings.Count(doc, "server {") != 3 {
-		t.Fatalf("Expected 3 server { in generated config, 1 default and 2 for each namespace")
+	if strings.Count(doc, "server {") != 4 {
+		t.Fatalf("Expected 4 server { in generated config, 1 default and 3 for each hostname")
 	}
 
 	if idx := strings.Index(doc, "server_name api.ex.net;"); idx < 0 {
 		t.Fatalf("Expected single server_name for namespace")
 	}
 
-	if idx := strings.Index(doc, "server_name api.ag.net api.v2.ag.net;"); idx < 0 {
-		t.Fatalf("Expected multiple server_name for namespace")
+	if idx := strings.Index(doc, "server_name api.ag.net;"); idx < 0 {
+		t.Fatalf("Expected single server_name for namespace")
+	}
+
+	if idx := strings.Index(doc, "server_name api.v2.ag.net;"); idx < 0 {
+		t.Fatalf("Expected single server_name for namespace")
 	}
 
 	tmplData := getConfig()
@@ -248,8 +252,8 @@ func TestGetConfNoPodsOnlyNamespace(t *testing.T) {
 		t.Fatalf("Failed to write template %v", err)
 	}
 
-	if strings.Count(doc, defaultLocation.String()) != 2 {
-		t.Fatalf("Expected 2 default locations for each namespace")
+	if strings.Count(doc, defaultLocation.String()) != 3 {
+		t.Fatalf("Expected 2 default locations for each host")
 	}
 }
 
@@ -471,7 +475,232 @@ func TestGetConfCheckLocationTargetPath(t *testing.T) {
 		t.Fatalf("Expected location /users in config")
 	}
 
-	if strings.Count(doc, "proxy_pass http://upstream1694016776/people;") != 1 {
+	if strings.Count(doc, "proxy_pass http://upstream3563244012/people;") != 1 {
+		t.Fatalf("Expected proxy_pass to include /people")
+	}
+}
+
+func TestGetConfMissingNamespace(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "location /users {") != 0 {
+		t.Fatalf("Should not generate a location for /users")
+	}
+
+	if strings.Count(doc, "server {") != 1 {
+		t.Fatalf("Only default server should be generated")
+	}
+}
+
+// TestGetConfCheckMultipleNamespacesOneHostname - Regression test to ensure we support multiple namespaces using the same host
+func TestGetConfCheckMultipleNamespacesOneHostname(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Namespaces["other-namespace"] = &router.Namespace{
+		Name:         "other-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "other-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	cache.Pods["some-pod2"] = &router.PodWithRoutes{
+		Name:      "some-pod2",
+		Namespace: "other-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/accounts"},
+			Outgoing: &router.Outgoing{IP: "1.3.3.4", Port: "8080"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "server_name api.ex.net;") != 1 {
+		t.Fatalf("Should only be 1 server_name api.ex.net for both namespaces.")
+	}
+
+	if strings.Count(doc, "location /users {") != 1 {
+		t.Fatalf("Should have /users location")
+	}
+
+	if strings.Count(doc, "location /accounts {") != 1 {
+		t.Fatalf("Should have /accounts location")
+	}
+}
+
+// TestGetConfDuplicateHostnameAndPath - Regression test for pods in different namespaces using same path when both namespaces use the samme host
+func TestGetConfDuplicateHostnameAndPath(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Namespaces["other-namespace"] = &router.Namespace{
+		Name:         "other-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "other-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	cache.Pods["some-pod2"] = &router.PodWithRoutes{
+		Name:      "some-pod2",
+		Namespace: "other-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.3.3.4", Port: "8080"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "server_name api.ex.net;") != 1 {
+		t.Fatalf("Should only be 1 server_name api.ex.net for both namespaces.")
+	}
+
+	if strings.Count(doc, "location /users {") != 1 {
+		t.Fatalf("Should have /users location")
+	}
+
+	count := strings.Count(doc, "server 1.2.3.4:8080;") + strings.Count(doc, "server 1.3.3.4:8080;")
+	if count != 1 {
+		t.Fatalf("Should have only one pod in upstream.")
+	}
+}
+
+// TestGetConfSecondPodUpdatesTargetPathFirstNil - Regression test for pods in with different targetPath for same host path
+func TestGetConfSecondPodUpdatesTargetPathFirstNil(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+
+	cache.Pods["other-pod1"] = &router.PodWithRoutes{
+		Name:      "other-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	targetPath := "/people"
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", TargetPath: &targetPath},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "location /users {") != 1 {
+		t.Fatalf("Expected location /users in config")
+	}
+
+	if strings.Count(doc, "proxy_pass http://upstream3563244012/people;") != 1 {
+		t.Fatalf("Expected proxy_pass to include /people")
+	}
+}
+
+// TestGetConfSecondPodUpdatesTargetPath - Regression test for pods in with different targetPath for same host path
+func TestGetConfSecondPodUpdatesTargetPath(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+
+	targetPath1 := "/users"
+	cache.Pods["other-pod1"] = &router.PodWithRoutes{
+		Name:      "other-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", TargetPath: &targetPath1},
+		}},
+	}
+
+	targetPath2 := "/people"
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", TargetPath: &targetPath2},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "location /users {") != 1 {
+		t.Fatalf("Expected location /users in config")
+	}
+
+	if strings.Count(doc, "proxy_pass http://upstream3563244012/users;") != 1 {
 		t.Fatalf("Expected proxy_pass to include /people")
 	}
 }
