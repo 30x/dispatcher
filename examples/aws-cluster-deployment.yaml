@@ -1,0 +1,82 @@
+####
+# Deployes the ingress controller as a daemon set, then creates the external ELB to serve it traffic
+###
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: dispatchers
+  labels:
+    app: dispatchers
+spec:
+  template:
+    metadata:
+      labels:
+        app: dispatchers
+      annotations: 
+        projectcalico.org/policy: "allow tcp from cidr 192.168.0.0/16; allow tcp from cidr 10.129.0.0/16"
+    spec:
+      containers:
+      - image: registry-1.docker.io/thirtyx/dispatcher:latest
+        imagePullPolicy: Always
+        name: k8s-public-router
+        ports:
+          - containerPort: 80
+            hostPort: 80
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          # Use the configuration to use the public/private paradigm (public version)
+          - name: API_KEY_SECRET_FIELD
+            value: public-api-key
+          - name: HOSTS_ANNOTATION
+            value: github.com/30x.dispatcher.hosts.public
+          - name: PATHS_ANNOTATION
+            value: github.com/30x.dispatcher.paths.public
+      - image: registry-1.docker.io/thirtyx/k8s-router:latest
+        imagePullPolicy: Always
+        name: k8s-private-router
+        ports:
+          - containerPort: 80
+            # If we were using services, we could avoid exposing this port and could use service mechanisms for
+            # identifying the port.  For now, we expose the host port and should lock it down to disallow external
+            # access.
+            hostPort: 81
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          # Use the configuration to use the public/private paradigm (private version)
+          - name: API_KEY_SECRET_FIELD
+            value: private-api-key
+          - name: HOSTS_ANNOTATION
+            value: github.com/30x.dispatcher.hosts.private
+          - name: PATHS_ANNOTATION
+            value: github.com/30x.dispatcher.paths.private
+          # Since we cannot have two containers listening on the same port, use a different port for the private router
+          - name: PORT
+            value: "81"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-public-router-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: dispatchers
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
