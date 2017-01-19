@@ -659,3 +659,160 @@ func TestGetConfSecondPodUpdatesTargetPathFirstNil(t *testing.T) {
 		t.Fatalf("Expected proxy_pass to include /people")
 	}
 }
+
+func TestPartialUpstreamHealthCheckHTTP(t *testing.T) {
+	resetConf()
+	check := router.HealthCheck{
+		HTTPCheck:          true,
+		Path:               "/health",
+		TimeoutMs:          2000,
+		IntervalMs:         10000,
+		HealthyThreshold:   2,
+		UnhealthyThreshold: 3,
+		Method:             "POST",
+		Port:               3000,
+	}
+
+	var doc bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc, "upstream-healthcheck", check); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	lookFor := []string{
+		"check_http_send \"POST /health HTTP/1.0\\r\\n\\r\\n\";",
+		"check_http_expect_alive http_2xx;",
+		"interval=10000",
+		"rise=2",
+		"fall=3",
+		"timeout=2000",
+		"port=3000",
+		"type=http",
+	}
+
+	for _, test := range lookFor {
+		if strings.Count(doc.String(), test) != 1 {
+			t.Fatalf("Expected %s in partial", test)
+		}
+	}
+}
+
+func TestPartialUpstreamHealthCheckTCP(t *testing.T) {
+	resetConf()
+	check := router.HealthCheck{
+		HTTPCheck:          false,
+		TimeoutMs:          2000,
+		IntervalMs:         10000,
+		HealthyThreshold:   2,
+		UnhealthyThreshold: 3,
+		Port:               3000,
+	}
+
+	var doc bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&doc, "upstream-healthcheck", check); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	lookFor := []string{
+		"interval=10000",
+		"rise=2",
+		"fall=3",
+		"timeout=2000",
+		"port=3000",
+		"type=tcp",
+	}
+
+	for _, test := range lookFor {
+		if strings.Count(doc.String(), test) != 1 {
+			t.Fatalf("Expected %s in partial", test)
+		}
+	}
+
+}
+
+func TestGetConfDisabledHealthChecks(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+
+	check := router.HealthCheck{
+		HTTPCheck:          true,
+		Path:               "/health",
+		TimeoutMs:          2000,
+		IntervalMs:         10000,
+		HealthyThreshold:   2,
+		UnhealthyThreshold: 3,
+		Method:             "POST",
+		Port:               3000,
+	}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", HealthCheck: &check},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "check_http_send") != 0 {
+		t.Fatalf("Should not be any health checks in upstream when Nginx.EnableHealthChecks is false")
+	}
+}
+
+func TestGetConfEnabledHealthChecks(t *testing.T) {
+	resetConf()
+
+	config.Nginx.EnableHealthChecks = true
+
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+
+	check := router.HealthCheck{
+		HTTPCheck:          true,
+		Path:               "/health",
+		TimeoutMs:          2000,
+		IntervalMs:         10000,
+		HealthyThreshold:   2,
+		UnhealthyThreshold: 3,
+		Method:             "POST",
+		Port:               3000,
+	}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080", HealthCheck: &check},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	var partialDoc bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&partialDoc, "upstream-healthcheck", check); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if strings.Count(doc, partialDoc.String()) != 1 {
+		t.Fatalf("Expected upstream to contain healthcheck partial")
+	}
+}

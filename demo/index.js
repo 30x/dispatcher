@@ -41,7 +41,7 @@ const getEnv = (req) => {
 const ifcs = {}
 const port = process.env.PORT || 3000
 const server = http.createServer((req, res) => {
-  console.log(req)
+  console.log(req.method, req.url, JSON.stringify(req.headers))
   res.writeHead(200, {
     'Content-Type': 'application/json'
   })

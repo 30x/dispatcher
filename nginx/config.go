@@ -25,7 +25,11 @@ http {
   # Upstream for {{$upstream.Path}} traffic on namespace {{$upstream.Namespace}}
   upstream {{$upstream.Name}} {
     {{range $server := $upstream.Servers}}
+    # Pod {{$server.Pod.Name}} (namespace: {{$server.Pod.Namespace}})
     server {{$server.Target}};
+    {{if and $.Config.Nginx.EnableHealthChecks $upstream.HealthCheck }}
+    {{template "upstream-healthcheck" $upstream.HealthCheck}}
+    {{- end}}
     {{- end}}
   }
   {{end -}}
@@ -78,6 +82,16 @@ events {
     }
 {{- end}}
 
+{{define "upstream-healthcheck" -}}
+    # Upstream Health Check for nginx_upstream_check_module - https://github.com/yaoweibin/nginx_upstream_check_module
+    {{- if .HTTPCheck}}
+    check interval={{.IntervalMs}} rise={{.HealthyThreshold}} fall={{.UnhealthyThreshold}} timeout={{.TimeoutMs}} port={{.Port}} type=http;
+    check_http_send "{{.Method}} {{.Path}} HTTP/1.0\r\n\r\n";
+    check_http_expect_alive http_2xx;
+    {{- else -}}
+    check interval={{.IntervalMs}} rise={{.HealthyThreshold}} fall={{.UnhealthyThreshold}} timeout={{.TimeoutMs}} port={{.Port}} type=tcp;
+    {{- end}}
+{{- end}}
 
 {{define "http-preamble" -}}
   # http://nginx.org/en/docs/http/ngx_http_core_module.html
@@ -124,10 +138,11 @@ type locationT struct {
 }
 
 type upstreamT struct {
-	Namespace string
-	Name      string
-	Path      string
-	Servers   serversT
+	Namespace   string
+	Name        string
+	Path        string
+	Servers     serversT
+	HealthCheck *router.HealthCheck
 }
 
 type serverT struct {
@@ -291,12 +306,18 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 
 					// Sort to make finding your pods in an upstream easier
 					sort.Sort(upstream.Servers)
+
+					if upstream.HealthCheck == nil && route.Outgoing.HealthCheck != nil {
+						log.Printf("  Nginx Conf: Inconsistent HealthCheck for host:%s path:%s", hostName, route.Incoming.Path)
+						upstream.HealthCheck = route.Outgoing.HealthCheck
+					}
 				} else {
 					// Create new upstream
 					tmplData.Upstreams[upstreamKey] = &upstreamT{
-						Name:      upstreamName,
-						Namespace: pod.Namespace,
-						Path:      route.Incoming.Path,
+						Name:        upstreamName,
+						Namespace:   pod.Namespace,
+						Path:        route.Incoming.Path,
+						HealthCheck: route.Outgoing.HealthCheck,
 						Servers: []*serverT{
 							&serverT{
 								Pod:    pod,

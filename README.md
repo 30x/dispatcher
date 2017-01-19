@@ -154,6 +154,38 @@ everyone, we just leave it up to the client to make an HTTP 1.1 request.
 So when you look at the generated nginx configuration and see some duplicate configuration related to WebSockets, or
 you see that we are not forcing HTTP 1.1, now you know.
 
+# Nginx Health Checks
+
+The router has an optional feature to enable nginx health checks on upstreams. It's only available when a when using nginx built with [nginx_upstream_check_module](https://github.com/xiaokai-wang/nginx_upstream_check_module) and enabled in the router with `ENABLE_NGINX_UPSTREAM_CHECK`.
+
+The nginx config is built from the Pod's [ReadinessProbe](http://kubernetes.io/docs/user-guide/pod-states/#container-probes) or [LivenessProbe](http://kubernetes.io/docs/user-guide/pod-states/#container-probes) in that order.
+
+For example a pod with the `redinessProbe`:
+``` yaml
+readinessProbe:
+  httpGet:
+    path: /status
+    scheme: HTTP
+  periodSeconds: 10
+  successThreshold: 2
+  failureThreshold: 3
+  timeoutSeconds: 5
+```
+
+Would generate a health check on the upstream.
+
+```
+upstream upstream619897598 {
+  # Pod 1
+  server 1.2.3.4;
+
+  # Upstream Health Check for nginx_upstream_check_module - https://github.com/yaoweibin/nginx_upstream_check_module 
+  check interval=10000 rise=2 fall=3 timeout=5000 port=0 type=http;
+  check_http_send "GET /status HTTP/1.0\r\n\r\n";
+  check_http_expect_alive http_2xx; 
+}
+```
+
 # Examples
 
 ## An Ingress Controller

@@ -165,7 +165,12 @@ func GetRoutes(config *Config, pod *api.Pod) []*Route {
 
 		route := Route{
 			&Incoming{Path: path.BasePath},
-			&Outgoing{IP: pod.Status.PodIP, Port: path.ContainerPort, TargetPath: path.TargetPath},
+			&Outgoing{
+				IP:          pod.Status.PodIP,
+				Port:        path.ContainerPort,
+				TargetPath:  path.TargetPath,
+				HealthCheck: getHealthCheckFromPodPort(pod, int32(port)),
+			},
 		}
 
 		routes = append(routes, &route)
@@ -302,6 +307,56 @@ func calculatePodHash(config *Config, pod *api.Pod) uint64 {
 
 	// TODO: Add healthcheck to hash
 	return h.Sum64()
+}
+
+/*
+getHealthCheckFromPodPort gets health check model from a Pod spec and a container port
+*/
+func getHealthCheckFromPodPort(pod *api.Pod, checkPort int32) *HealthCheck {
+	check := HealthCheck{}
+
+	// Create a list of valid routing ports
+	for _, container := range pod.Spec.Containers {
+		// Pod has multiple containers, return health check for a container port
+		for _, port := range container.Ports {
+			if port.ContainerPort == checkPort {
+				var probe *api.Probe
+				// Check ReadinessProbe and use first
+				if container.ReadinessProbe != nil {
+					probe = container.ReadinessProbe
+				} else if container.LivenessProbe != nil { // Fallback on LivenessProbe
+					probe = container.LivenessProbe
+				}
+
+				// If non are found don't create HealthCheck
+				if probe == nil {
+					return nil
+				}
+
+				check.HTTPCheck = false
+				check.TimeoutMs = probe.TimeoutSeconds * 1000 // convert to ms
+				check.IntervalMs = probe.PeriodSeconds * 1000 // convert to ms
+				check.UnhealthyThreshold = probe.FailureThreshold
+				check.HealthyThreshold = probe.SuccessThreshold
+
+				if probe.Handler.HTTPGet != nil {
+					check.HTTPCheck = true
+					check.Port = int32(probe.Handler.HTTPGet.Port.IntValue())
+					check.Path = probe.Handler.HTTPGet.Path
+					// Default to GET kubernetes doesn't have method option
+					check.Method = "GET"
+				} else if probe.Handler.TCPSocket != nil {
+					check.Port = int32(probe.Handler.TCPSocket.Port.IntValue())
+				} else {
+					check.Port = checkPort
+				}
+
+				return &check
+			}
+		}
+	}
+
+	return nil
 }
 
 /*

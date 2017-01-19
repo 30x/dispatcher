@@ -3,6 +3,7 @@ package router
 import (
 	"encoding/json"
 	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/util/intstr"
 	"strconv"
 	"testing"
 )
@@ -641,4 +642,134 @@ func TestPodWatchableSetCacheCompare(t *testing.T) {
 	if set.CacheCompare(cache, pod4) != false {
 		t.Fatalf("Pod3 should not match anything that is in cache, namespace not added.")
 	}
+}
+
+func compareHealthCheck(t *testing.T, expected, actual *HealthCheck, test string) {
+	if expected == nil && actual != nil {
+		t.Fatalf("%s expected healthcheck to be nil", test)
+	}
+
+	if expected != nil && actual == nil {
+		t.Fatalf("%s expected healthcheck to not be nil", test)
+	}
+
+	if expected == nil && actual == nil {
+		return
+	}
+
+	if expected.HTTPCheck != actual.HTTPCheck {
+		t.Fatalf("%s expected healthcheck.HTTPCheck to be %v", test, expected.HTTPCheck)
+	}
+
+	if expected.Path != actual.Path {
+		t.Fatalf("%s expected healthcheck.Path to be %s but was %s", test, expected.Path, actual.Path)
+	}
+
+	if expected.Method != actual.Method {
+		t.Fatalf("%s expected healthcheck.Method to be %s but was %s", test, expected.Method, actual.Method)
+	}
+
+	if expected.TimeoutMs != actual.TimeoutMs {
+		t.Fatalf("%s expected healthcheck.TimeoutMs to be %d but was %d", test, expected.TimeoutMs, actual.TimeoutMs)
+	}
+
+	if expected.IntervalMs != actual.IntervalMs {
+		t.Fatalf("%s expected healthcheck.IntervalMs to be %d but was %d", test, expected.IntervalMs, actual.IntervalMs)
+	}
+
+	if expected.UnhealthyThreshold != actual.UnhealthyThreshold {
+		t.Fatalf("%s expected healthcheck.UnhealthyThreshold to be %d but was %d", test, expected.UnhealthyThreshold, actual.UnhealthyThreshold)
+	}
+
+	if expected.HealthyThreshold != actual.HealthyThreshold {
+		t.Fatalf("%s expected healthcheck.HealthyThreshold to be %d but was %d", test, expected.HealthyThreshold, actual.HealthyThreshold)
+	}
+
+	if expected.Port != actual.Port {
+		t.Fatalf("%s expected healthcheck.Port to be %d but was %d", test, expected.Port, actual.Port)
+	}
+
+}
+
+/*
+Test for github.com/30x/dispatcher/pkg/router#PodWatchableSet.CacheCompare
+*/
+func TestGetHealthCheckFromPodPort(t *testing.T) {
+
+	pod1 := genK8sPod("some-pod", genRoutes(path("/", "3000", "")), "1.2.3.4", api.PodRunning, []string{"3000"})
+
+	pod1.Spec.Containers[0].ReadinessProbe = &api.Probe{
+		TimeoutSeconds:   23,
+		SuccessThreshold: 2,
+		FailureThreshold: 3,
+		PeriodSeconds:    5,
+		Handler: api.Handler{
+			HTTPGet: &api.HTTPGetAction{
+				Path: "/test",
+				Port: intstr.FromInt(3000),
+			},
+		},
+	}
+
+	compareHealthCheck(t, nil, getHealthCheckFromPodPort(pod1, 3001), "should be nil for invalid port")
+
+	compareHealthCheck(t, &HealthCheck{
+		HTTPCheck:          true,
+		Path:               "/test",
+		Method:             "GET",
+		TimeoutMs:          23000,
+		IntervalMs:         5000,
+		UnhealthyThreshold: 3,
+		HealthyThreshold:   2,
+		Port:               3000,
+	}, getHealthCheckFromPodPort(pod1, 3000), "should equal valid healthcheck")
+
+	pod1.Spec.Containers[0].ReadinessProbe = nil
+	pod1.Spec.Containers[0].LivenessProbe = &api.Probe{
+		TimeoutSeconds:   23,
+		SuccessThreshold: 2,
+		FailureThreshold: 3,
+		PeriodSeconds:    5,
+		Handler: api.Handler{
+			HTTPGet: &api.HTTPGetAction{
+				Path: "/test",
+				Port: intstr.FromInt(3000),
+			},
+		},
+	}
+
+	compareHealthCheck(t, &HealthCheck{
+		HTTPCheck:          true,
+		Path:               "/test",
+		Method:             "GET",
+		TimeoutMs:          23000,
+		IntervalMs:         5000,
+		UnhealthyThreshold: 3,
+		HealthyThreshold:   2,
+		Port:               3000,
+	}, getHealthCheckFromPodPort(pod1, 3000), "should equal valid healthcheck from LivenessProbe")
+
+	pod1.Spec.Containers[0].LivenessProbe = &api.Probe{
+		TimeoutSeconds:   23,
+		SuccessThreshold: 2,
+		FailureThreshold: 3,
+		PeriodSeconds:    5,
+		Handler: api.Handler{
+			TCPSocket: &api.TCPSocketAction{
+				Port: intstr.FromInt(3000),
+			},
+		},
+	}
+
+	compareHealthCheck(t, &HealthCheck{
+		HTTPCheck:          false,
+		Path:               "",
+		Method:             "",
+		TimeoutMs:          23000,
+		IntervalMs:         5000,
+		UnhealthyThreshold: 3,
+		HealthyThreshold:   2,
+		Port:               3000,
+	}, getHealthCheckFromPodPort(pod1, 3000), "should equal valid healthcheck from LivenessProbe")
+
 }
