@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/watch"
 	"log"
+	"reflect"
 	"time"
 )
 
@@ -24,6 +25,24 @@ type Event struct {
 
 // Time window to capture events before prossing batch
 const eventWindow time.Duration = 2000 * time.Millisecond
+
+func printConf(config router.Config) {
+	var logInterface func(v reflect.Value, base string)
+	logInterface = func(v reflect.Value, base string) {
+		for i := 0; i < v.NumField(); i++ {
+			switch v.Type().Field(i).Type.Kind() {
+			case reflect.Struct:
+				logInterface(v.Field(i), v.Type().Field(i).Name+".")
+			default:
+				log.Printf("    %s%s  =  %v\n", base, v.Type().Field(i).Name, v.Field(i).Interface())
+			}
+		}
+	}
+
+	log.Println("  Using configuration:")
+	logInterface(reflect.ValueOf(config), "")
+	log.Println("")
+}
 
 func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*router.Cache, []*ResourceWatch) {
 
@@ -72,6 +91,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid configuration: %v.", err)
 	}
+
+	printConf(*config)
 
 	// Create the Kubernetes Client
 	kubeClient, err := kube.GetClient()
