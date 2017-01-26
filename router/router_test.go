@@ -155,3 +155,35 @@ func TestProcessEventResourceModifiedChangedUnWatchable(t *testing.T) {
 		t.Fatal("resouce should be removed from cache")
 	}
 }
+
+/*
+Test for github.com/30x/dispatcher/pkg/router#ProcessEvent - Resource added that is not watchable
+*/
+func TestProcessEventResourceAddedNonWatchaable(t *testing.T) {
+	cache := NewCache()
+	set := SecretWatchableSet{Config: config}
+	k8sSecret := api.Secret{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "not-the-right-secret",
+			Namespace: "my-namespace",
+		},
+		Data: map[string][]byte{
+			"api-key": []byte("API-Key"),
+		},
+	}
+
+	needsRestart := ProcessEvent(cache, set, watch.Event{
+		Type:   watch.Added,
+		Object: &k8sSecret,
+	})
+
+	if needsRestart {
+		t.Fatal("resource added that is not watchable should not trigger restart")
+	}
+
+	_, ok := cache.Secrets["my-namespace"]
+	if ok {
+		t.Fatal("new resource should not be in cache")
+	}
+
+}

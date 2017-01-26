@@ -13,10 +13,12 @@ ProcessEvent takes in a WatchableResourceSet and a k8s watch.Event and runs the 
 func ProcessEvent(cache *Cache, resourceType WatchableResourceSet, event watch.Event) bool {
 	switch event.Type {
 	case watch.Added:
-		// Resource Added add to cache
-		newResource := resourceType.ConvertToModel(event.Object)
-		resourceType.CacheAdd(cache, newResource)
-		return true
+		if resourceType.Watchable(event.Object) {
+			// Resource Added add to cache
+			newResource := resourceType.ConvertToModel(event.Object)
+			resourceType.CacheAdd(cache, newResource)
+			return true
+		}
 	case watch.Deleted:
 		// Resource delete try and remove from cache
 		resourceType.CacheRemove(cache, resourceType.IDFromObject(event.Object))

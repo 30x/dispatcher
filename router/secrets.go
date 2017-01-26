@@ -105,7 +105,11 @@ Watchable tests where the *api.Secret inputed has the Name of of the configured 
 */
 func (s SecretWatchableSet) Watchable(in interface{}) bool {
 	k8Secret := in.(*api.Secret)
-	return k8Secret.Name == s.Config.APIKeySecret
+	if k8Secret.Name != s.Config.APIKeySecret {
+		return false
+	}
+	_, ok := k8Secret.Data[s.Config.APIKeySecretDataField]
+	return ok
 }
 
 /*
