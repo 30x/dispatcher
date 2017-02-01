@@ -89,9 +89,9 @@ General Configuration:
 Nginx Configuration:
 * `API_KEY_HEADER`: This is the header name used by nginx to identify the API Key used _(Default: `X-ROUTING-API-KEY`)_
 * `DEFAULT_LOCATION_RETURN`: Configures nginx to return a status code of proxy to a URI if a request does not match any configured paths in a known host. Can be either a HTTP status code or URI that nginx uses with proxy_pass. _(Default: `404`)_
-* `NGINX_ENABLE_STATUS_ENDPOINT`: Enables a /dispatcher/status endpoint on the default server. (Default: `false`)
 * `NGINX_ENABLE_HEALTH_CHECKS`: Enables nginx upstream health checks. (Default: `false`)
 * `NGINX_MAX_CLIENT_BODY_SIZE`: Configures the max client request body size of nginx. _(Default: `0`, Disables checking of client request body size.)_
+* `NGINX_STATUS_PATH`: Change the nginx status path that returns 200 on the default server. (Default: `/dispatcher/status`)
 * `PORT`: This is the port that nginx will listen on _(Default: `80`)_
 
 # Security

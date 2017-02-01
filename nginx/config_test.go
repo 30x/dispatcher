@@ -58,19 +58,19 @@ func TestPartialDefaultServer(t *testing.T) {
 		t.Fatalf("Expected default server to only return 444;")
 	}
 
-	if strings.Count(doc.String(), "location /dispatcher/status {") != 0 {
-		t.Fatalf("Expected default to not have status location;")
+	if strings.Count(doc.String(), "location = /dispatcher/status {") != 1 {
+		t.Fatalf("Expected default status path")
 	}
 
-	// Enable status endpoint
-	tmplData.Config.Nginx.EnableStatusEndpoint = true
+	// Update Status Path
+	tmplData.Config.Nginx.StatusPath = "/some/other/status"
 
 	if err := nginxTemplate.ExecuteTemplate(&doc, "default-server", tmplData); err != nil {
 		t.Fatalf("Failed to write template %v", err)
 	}
 
-	if strings.Count(doc.String(), "location /dispatcher/status {") != 1 {
-		t.Fatalf("Expected default to have status location;")
+	if strings.Count(doc.String(), "location = /some/other/status {") != 1 {
+		t.Fatalf("Expected default server to have updated status path;")
 	}
 
 }

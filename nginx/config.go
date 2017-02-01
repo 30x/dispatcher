@@ -71,11 +71,11 @@ events {
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
-    {{if .Config.Nginx.EnableStatusEndpoint}}
-    location /dispatcher/status {
+
+    location = {{.Config.Nginx.StatusPath}} {
       return 200;
     }
-    {{- end}}
+
     location / {
       return 444;
     }
