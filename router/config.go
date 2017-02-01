@@ -24,6 +24,8 @@ const (
 	ErrMsgTmplInvalidServerReturnHTTPStatusCode = "%d is an invalid status code 100-999 for default server return"
 	// ErrMsgTmplInvalidServerReturnURL is the error message for an invalid url used for default server
 	ErrMsgTmplInvalidServerReturnURL = "%s is an invalid url for default server return %v"
+	//ErrMsgTmplInvalidPath is the error message for an invalid path
+	ErrMsgTmplInvalidPath = "%s is an invalid path"
 )
 
 /*
@@ -60,6 +62,8 @@ type NginxConfig struct {
 	APIKeyHeader string
 	// Enable or disable nginx health checks for each pod
 	EnableHealthChecks bool
+	// Status path for nginx status endpoint on default server.
+	StatusPath string
 	// Max client request body size. nginx config: client_max_body_size. eg 10m
 	MaxClientBodySize string
 	// The port that nginx will listen on
@@ -124,6 +128,8 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.APIKeyHeader", "API_KEY_HEADER", "X-ROUTING-API-KEY")
 	// Enable or disable nginx health checks using custom upstream check module. Default: disabled
 	addConfig("Nginx.EnableHealthChecks", "NGINX_ENABLE_HEALTH_CHECKS", false)
+	// Enable or disable /dispatcher/status endpoint on default nginx server.
+	addConfig("Nginx.StatusPath", "NGINX_STATUS_PATH", "/dispatcher/status")
 	// Nginx max client request size. Default 0, unlimited
 	addConfig("Nginx.MaxClientBodySize", "NGINX_MAX_CLIENT_BODY_SIZE", "0")
 	// The port that nginx will listen on
@@ -179,6 +185,11 @@ func ConfigFromEnv() (*Config, error) {
 		if code < 100 || code > 999 {
 			return nil, fmt.Errorf(ErrMsgTmplInvalidServerReturnHTTPStatusCode, code)
 		}
+	}
+
+	// Validate nginx status path
+	if !validatePath(config.Nginx.StatusPath) {
+		return nil, fmt.Errorf(ErrMsgTmplInvalidPath, config.Nginx.StatusPath)
 	}
 
 	return &config, nil

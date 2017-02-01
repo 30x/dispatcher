@@ -71,7 +71,14 @@ events {
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
-    return 444;
+
+    location = {{.Config.Nginx.StatusPath}} {
+      return 200;
+    }
+
+    location / {
+      return 444;
+    }
   }
 {{- end}}
 

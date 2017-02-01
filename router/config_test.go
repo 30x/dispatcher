@@ -81,3 +81,15 @@ func TestConfigFromEnvInvailidDefaultServerReturnCode(t *testing.T) {
 		t.Fatal("Error should not nil")
 	}
 }
+
+/*
+Test for ConfigFromEnv should throw error on invalid default server return status code
+*/
+func TestConfigFromEnvInvailidStatusPath(t *testing.T) {
+	resetEnv()
+	os.Setenv("NGINX_STATUS_PATH", "/<>asd")
+	_, err := ConfigFromEnv()
+	if err == nil {
+		t.Fatal("Error should not nil")
+	}
+}
