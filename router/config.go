@@ -60,6 +60,8 @@ type NginxConfig struct {
 	APIKeyHeader string
 	// Enable or disable nginx health checks for each pod
 	EnableHealthChecks bool
+	// Enable /status endpoint on default server.
+	EnableStatusEndpoint bool
 	// Max client request body size. nginx config: client_max_body_size. eg 10m
 	MaxClientBodySize string
 	// The port that nginx will listen on
@@ -124,6 +126,8 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.APIKeyHeader", "API_KEY_HEADER", "X-ROUTING-API-KEY")
 	// Enable or disable nginx health checks using custom upstream check module. Default: disabled
 	addConfig("Nginx.EnableHealthChecks", "NGINX_ENABLE_HEALTH_CHECKS", false)
+	// Enable or disable /dispatcher/status endpoint on default nginx server.
+	addConfig("Nginx.EnableStatusEndpoint", "NGINX_ENABLE_STATUS_ENDPOINT", false)
 	// Nginx max client request size. Default 0, unlimited
 	addConfig("Nginx.MaxClientBodySize", "NGINX_MAX_CLIENT_BODY_SIZE", "0")
 	// The port that nginx will listen on
