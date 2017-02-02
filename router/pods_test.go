@@ -269,6 +269,54 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 			PodIP: "1.2.3.4",
 		},
 	}))
+
+	// "%ZZ" is not a valid path for targetPath segment
+	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{
+				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "test")),
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				api.Container{
+					Ports: []api.ContainerPort{
+						api.ContainerPort{
+							ContainerPort: int32(3000),
+						},
+					},
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
+		},
+	}))
+
+	// "%ZZ" is not a valid path for targetPath segment
+	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{
+				config.PodsPathsAnnotation: genRoutes(path("/test/%2a/%", "3000", "")),
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				api.Container{
+					Ports: []api.ContainerPort{
+						api.ContainerPort{
+							ContainerPort: int32(3000),
+						},
+					},
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
+		},
+	}))
 }
 
 /*
