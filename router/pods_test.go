@@ -803,17 +803,27 @@ func TestValidatePath(t *testing.T) {
 	testNoPrefix := "test"
 	testPathFail := "/test/%2a/%"
 	testPathPass := "/test/%2a/aa/a"
+	testPathPassProperEncoding := "/test/par%2ate/aa/a"
+	testPathPassInvalidEncoding := "/test/hello%zzworld/aa/a"
 
 	if validatePath(testNoPrefix) == true {
-		t.Fatalf("Expected false got true")
+		t.Fatalf("Expected (%s) to fail. Url with no / at begening of url.", testNoPrefix)
 	}
 
 	if validatePath(testPathFail) == true {
-		t.Fatalf("Expected false got true")
+		t.Fatalf("Expected (%s) to fail. Url with invalid encoding as entire path segment.", testPathFail)
 	}
 
 	if validatePath(testPathPass) == false {
-		t.Fatalf("Expected true got false")
+		t.Fatalf("Expected (%s) to pass. Valid encoding as entire path segment should pass.", testPathPass)
+	}
+
+	if validatePath(testPathPassProperEncoding) == false {
+		t.Fatalf("Expected (%s) to pass. Valid encoding in middle of path segment should pass.", testPathPassProperEncoding)
+	}
+
+	if validatePath(testPathPassInvalidEncoding) == true {
+		t.Fatalf("Expected (%s) to fail. Invalid encoding in middle of path segment should fail.", testPathPassInvalidEncoding)
 	}
 
 }
