@@ -293,30 +293,6 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 			PodIP: "1.2.3.4",
 		},
 	}))
-
-	// "%ZZ" is not a valid path for targetPath segment
-	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Annotations: map[string]string{
-				config.PodsPathsAnnotation: genRoutes(path("/test/%2a/%", "3000", "")),
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				api.Container{
-					Ports: []api.ContainerPort{
-						api.ContainerPort{
-							ContainerPort: int32(3000),
-						},
-					},
-				},
-			},
-		},
-		Status: api.PodStatus{
-			Phase: api.PodRunning,
-			PodIP: "1.2.3.4",
-		},
-	}))
 }
 
 /*
@@ -819,5 +795,25 @@ func TestGetHealthCheckFromPodPort(t *testing.T) {
 		HealthyThreshold:   2,
 		Port:               3000,
 	}, getHealthCheckFromPodPort(pod1, 3000), "should equal valid healthcheck from LivenessProbe")
+
+}
+
+// TestValidatePath tests the internal function to validate a proper path used in annotations
+func TestValidatePath(t *testing.T) {
+	testNoPrefix := "test"
+	testPathFail := "/test/%2a/%"
+	testPathPass := "/test/%2a/aa/a"
+
+	if validatePath(testNoPrefix) == true {
+		t.Fatalf("Expected false got true")
+	}
+
+	if validatePath(testPathFail) == true {
+		t.Fatalf("Expected false got true")
+	}
+
+	if validatePath(testPathPass) == false {
+		t.Fatalf("Expected true got false")
+	}
 
 }
