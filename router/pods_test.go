@@ -804,7 +804,7 @@ func TestValidatePath(t *testing.T) {
 	testPathFail := "/test/%2a/%"
 	testPathPass := "/test/%2a/aa/a"
 	testPathPassProperEncoding := "/test/par%2ate/aa/a"
-	testPathPassInvalidEncoding := "/test/hello%zzworld/aa/a"
+	testPathFailInvalidEncoding := "/test/hello%zzworld/aa/a"
 
 	if validatePath(testNoPrefix) == true {
 		t.Fatalf("Expected (%s) to fail. Url with no / at begening of url.", testNoPrefix)
@@ -822,8 +822,8 @@ func TestValidatePath(t *testing.T) {
 		t.Fatalf("Expected (%s) to pass. Valid encoding in middle of path segment should pass.", testPathPassProperEncoding)
 	}
 
-	if validatePath(testPathPassInvalidEncoding) == true {
-		t.Fatalf("Expected (%s) to fail. Invalid encoding in middle of path segment should fail.", testPathPassInvalidEncoding)
+	if validatePath(testPathFailInvalidEncoding) == true {
+		t.Fatalf("Expected (%s) to fail. Invalid encoding in middle of path segment should fail.", testPathFailInvalidEncoding)
 	}
 
 }
