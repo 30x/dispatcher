@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	pathSegmentRegexStr = "^[A-Za-z0-9\\-._~!$&'()*+,;=:@]|%[0-9A-Fa-f]{2}$"
+	pathSegmentRegexStr = `^([A-Za-z0-9\-._~!$&'()*+,;=:@]+|%[0-9A-Fa-f]{2})+$`
 )
 
 var pathSegmentRegex *regexp.Regexp
@@ -372,6 +372,9 @@ func isContainerPort(ports []int32, port int32) bool {
 }
 
 func validatePath(path string) bool {
+	if !strings.HasPrefix(path, "/") {
+		return false
+	}
 	pathSegments := strings.Split(path, "/")
 	for i, pathSegment := range pathSegments {
 		if (i == 0 || i == len(pathSegments)-1) && pathSegment == "" {
@@ -380,6 +383,5 @@ func validatePath(path string) bool {
 			return false
 		}
 	}
-
 	return true
 }

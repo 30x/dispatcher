@@ -269,6 +269,30 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 			PodIP: "1.2.3.4",
 		},
 	}))
+
+	// "%ZZ" is not a valid path for targetPath segment
+	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{
+				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "test")),
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				api.Container{
+					Ports: []api.ContainerPort{
+						api.ContainerPort{
+							ContainerPort: int32(3000),
+						},
+					},
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Phase: api.PodRunning,
+			PodIP: "1.2.3.4",
+		},
+	}))
 }
 
 /*
@@ -771,5 +795,35 @@ func TestGetHealthCheckFromPodPort(t *testing.T) {
 		HealthyThreshold:   2,
 		Port:               3000,
 	}, getHealthCheckFromPodPort(pod1, 3000), "should equal valid healthcheck from LivenessProbe")
+
+}
+
+// TestValidatePath tests the internal function to validate a proper path used in annotations
+func TestValidatePath(t *testing.T) {
+	testNoPrefix := "test"
+	testPathFail := "/test/%2a/%"
+	testPathPass := "/test/%2a/aa/a"
+	testPathPassProperEncoding := "/test/par%2ate/aa/a"
+	testPathFailInvalidEncoding := "/test/hello%zzworld/aa/a"
+
+	if validatePath(testNoPrefix) == true {
+		t.Fatalf("Expected (%s) to fail. Url with no / at begening of url.", testNoPrefix)
+	}
+
+	if validatePath(testPathFail) == true {
+		t.Fatalf("Expected (%s) to fail. Url with invalid encoding as entire path segment.", testPathFail)
+	}
+
+	if validatePath(testPathPass) == false {
+		t.Fatalf("Expected (%s) to pass. Valid encoding as entire path segment should pass.", testPathPass)
+	}
+
+	if validatePath(testPathPassProperEncoding) == false {
+		t.Fatalf("Expected (%s) to pass. Valid encoding in middle of path segment should pass.", testPathPassProperEncoding)
+	}
+
+	if validatePath(testPathFailInvalidEncoding) == true {
+		t.Fatalf("Expected (%s) to fail. Invalid encoding in middle of path segment should fail.", testPathFailInvalidEncoding)
+	}
 
 }
