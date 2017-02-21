@@ -24,6 +24,7 @@ http {
   {{range $key, $upstream := .Upstreams}}
   # Upstream for {{$upstream.Path}} traffic on namespace {{$upstream.Namespace}}
   upstream {{$upstream.Name}} {
+    keepalive 1024;
     {{range $server := $upstream.Servers}}
     # Pod {{$server.Pod.Name}} (namespace: {{$server.Pod.Namespace}})
     server {{$server.Target}};
@@ -48,6 +49,10 @@ http {
         return 403;
       }
       {{- end}}
+      # Force keepalive
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+
       #Upstream {{$location.Upstream}}
       proxy_pass http://{{$location.Upstream}}{{if $location.TargetPath}}{{$location.TargetPath}}{{end}};
     }
@@ -63,7 +68,8 @@ http {
 	partialsTmpl = `
 {{define "base-config" -}}
 events {
-  worker_connections 1024;
+  worker_connections  81920;
+  multi_accept        on;
 }
 {{- end}}
 
@@ -111,6 +117,12 @@ events {
 
   # Force HTTP 1.1 for upstream requests
   proxy_http_version 1.1;
+  
+  # timeout after 5s for upstreams
+  proxy_connect_timeout 5s;
+  
+  # Don't proxy req body in nginx, send directly to upstream
+  proxy_request_buffering off;
 
   # When nginx proxies to an upstream, the default value used for 'Connection' is 'close'.  We use this variable to do
   # the same thing so that whenever a 'Connection' header is in the request, the variable reflects the provided value
