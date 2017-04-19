@@ -11,7 +11,6 @@ import (
 	"log"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -372,16 +371,12 @@ func isContainerPort(ports []int32, port int32) bool {
 }
 
 func validatePath(path string) bool {
-	if !strings.HasPrefix(path, "/") {
+	// Don't allow empty path
+	if path == "" {
 		return false
 	}
-	pathSegments := strings.Split(path, "/")
-	for i, pathSegment := range pathSegments {
-		if (i == 0 || i == len(pathSegments)-1) && pathSegment == "" {
-			continue
-		} else if !pathSegmentRegex.MatchString(pathSegment) {
-			return false
-		}
-	}
-	return true
+
+	// Ensure path is a valid regex as that is what nginx validates on
+	_, error := regexp.Compile(path)
+	return error == nil
 }

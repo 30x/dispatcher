@@ -226,7 +226,7 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Annotations: map[string]string{
-				config.PodsPathsAnnotation: genRoutes(path("/people/%ZZ", "3000", "")),
+				config.PodsPathsAnnotation: genRoutes(path("[", "3000", "")),
 			},
 		},
 		Spec: api.PodSpec{
@@ -250,7 +250,7 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Annotations: map[string]string{
-				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "/people/%ZZ")),
+				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "[")),
 			},
 		},
 		Spec: api.PodSpec{
@@ -274,7 +274,7 @@ func TestGetRoutesInvalidPublicPathsPath(t *testing.T) {
 	validateRoutes(t, "pod has an invalid routingPaths path", []*Route{}, GetRoutes(config, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Annotations: map[string]string{
-				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "test")),
+				config.PodsPathsAnnotation: genRoutes(path("/", "3000", "[")),
 			},
 		},
 		Spec: api.PodSpec{
@@ -800,30 +800,26 @@ func TestGetHealthCheckFromPodPort(t *testing.T) {
 
 // TestValidatePath tests the internal function to validate a proper path used in annotations
 func TestValidatePath(t *testing.T) {
-	testNoPrefix := "test"
-	testPathFail := "/test/%2a/%"
-	testPathPass := "/test/%2a/aa/a"
-	testPathPassProperEncoding := "/test/par%2ate/aa/a"
-	testPathFailInvalidEncoding := "/test/hello%zzworld/aa/a"
+	testInvalidRegex := "["
+	testEmptyPath := ""
 
-	if validatePath(testNoPrefix) == true {
-		t.Fatalf("Expected (%s) to fail. Url with no / at begening of url.", testNoPrefix)
+	testPathPass := []string{
+		"/test/%2a/aa/a",
+		"/foo/",
+		"=/foo",
+		"~bar$",
+	}
+	if validatePath(testInvalidRegex) == true {
+		t.Fatalf("Expected (%s) to fail. Invalid regex for path.", testInvalidRegex)
 	}
 
-	if validatePath(testPathFail) == true {
-		t.Fatalf("Expected (%s) to fail. Url with invalid encoding as entire path segment.", testPathFail)
+	if validatePath(testEmptyPath) == true {
+		t.Fatalf("Expected (%s) to fail. Empty path.", testEmptyPath)
 	}
 
-	if validatePath(testPathPass) == false {
-		t.Fatalf("Expected (%s) to pass. Valid encoding as entire path segment should pass.", testPathPass)
+	for _, path := range testPathPass {
+		if validatePath(path) == false {
+			t.Fatalf("Expected (%s) to pass.", path)
+		}
 	}
-
-	if validatePath(testPathPassProperEncoding) == false {
-		t.Fatalf("Expected (%s) to pass. Valid encoding in middle of path segment should pass.", testPathPassProperEncoding)
-	}
-
-	if validatePath(testPathFailInvalidEncoding) == true {
-		t.Fatalf("Expected (%s) to fail. Invalid encoding in middle of path segment should fail.", testPathFailInvalidEncoding)
-	}
-
 }
