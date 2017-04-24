@@ -25,7 +25,7 @@ func init() {
 Test for github.com/30x/dispatcher/pkg/router#Secret.Id
 */
 func TestSecretId(t *testing.T) {
-	secret := Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret := Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
 	if secret.ID() != "my-namespace" {
 		t.Fatalf("Secret Id() should be \"my-namespace\" but was %s.", secret.ID())
 	}
@@ -35,10 +35,14 @@ func TestSecretId(t *testing.T) {
 Test for github.com/30x/dispatcher/pkg/router#Secret.Hash
 */
 func TestSecretHash(t *testing.T) {
-	secret1 := Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	secret2 := Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	secret3 := Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x6}}
-	secret4 := Secret{Namespace: "my-namespace2", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x6}}
+	secret1 := Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret1.hash = calculateSecretHash(&secret1)
+	secret2 := Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret2.hash = calculateSecretHash(&secret2)
+	secret3 := Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x6}}
+	secret3.hash = calculateSecretHash(&secret3)
+	secret4 := Secret{Namespace: "my-namespace2", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x6}}
+	secret4.hash = calculateSecretHash(&secret4)
 	if secret1.Hash() != 3708964778940489642 {
 		t.Fatalf("Secret Hash() should match 3708964778940489642 but was %d", secret1.Hash())
 	}
@@ -79,8 +83,8 @@ func TestSecretsConvertToModel(t *testing.T) {
 	}
 
 	secret := item.(*Secret)
-	if bytes.Compare(secret.Data, apiKey) != 0 {
-		t.Fatalf("Secret Data should match apiKey %v != %v", secret.Data, apiKey)
+	if bytes.Compare(*secret.RoutingKey, apiKey) != 0 {
+		t.Fatalf("Secret Data should match apiKey %v != %v", secret.RoutingKey, apiKey)
 	}
 }
 
@@ -146,8 +150,8 @@ Test for github.com/30x/dispatcher/pkg/router#NamespaceWatchableSet.CacheAdd
 func TestSecretsCacheAdd(t *testing.T) {
 	cache := NewCache()
 	secrets := SecretWatchableSet{Config: config}
-	secret1 := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	secret2 := &Secret{Namespace: "my-namespace2", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x6}}
+	secret1 := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret2 := &Secret{Namespace: "my-namespace2", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x6}}
 
 	secrets.CacheAdd(cache, secret1)
 	secrets.CacheAdd(cache, secret2)
@@ -170,7 +174,7 @@ func TestSecretsCacheAdd(t *testing.T) {
 		t.Fatalf("Test secret 2 should be in cache for my-namespace2 key")
 	}
 
-	secret3 := &Secret{Namespace: "my-namespace", Data: []byte{0x2, 0x2, 0x2, 0x2, 0x2}}
+	secret3 := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x2, 0x2, 0x2, 0x2, 0x2}}
 	secrets.CacheAdd(cache, secret3)
 	testSecret3, ok := cache.Secrets["my-namespace"]
 	if !ok {
@@ -187,7 +191,7 @@ Test for github.com/30x/dispatcher/pkg/router#NamespaceWatchableSet.CacheRemove
 func TestSecretsCacheRemove(t *testing.T) {
 	cache := NewCache()
 	set := SecretWatchableSet{Config: config}
-	secret := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
 
 	cache.Secrets[secret.ID()] = secret
 
@@ -205,10 +209,14 @@ Test for github.com/30x/dispatcher/pkg/router#NamespaceWatchableSet.CacheCompare
 func TestSecretsCacheCompare(t *testing.T) {
 	cache := NewCache()
 	set := SecretWatchableSet{Config: config}
-	secret1 := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	secret2 := &Secret{Namespace: "my-namespace", Data: []byte{0x1, 0x2, 0x3, 0x4, 0x5}}
-	secret3 := &Secret{Namespace: "my-namespace", Data: []byte{0x6, 0x7, 0x8, 0x9, 0x0}}
-	secret4 := &Secret{Namespace: "my-namespace2", Data: []byte{0x6, 0x7, 0x8, 0x9, 0x0}}
+	secret1 := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret1.hash = calculateSecretHash(secret1)
+	secret2 := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x1, 0x2, 0x3, 0x4, 0x5}}
+	secret2.hash = calculateSecretHash(secret2)
+	secret3 := &Secret{Namespace: "my-namespace", RoutingKey: &[]byte{0x6, 0x7, 0x8, 0x9, 0x0}}
+	secret3.hash = calculateSecretHash(secret3)
+	secret4 := &Secret{Namespace: "my-namespace2", RoutingKey: &[]byte{0x6, 0x7, 0x8, 0x9, 0x0}}
+	secret4.hash = calculateSecretHash(secret4)
 
 	cache.Secrets[secret1.ID()] = secret1
 	if set.CacheCompare(cache, secret2) != true {

@@ -280,9 +280,9 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 					// Calculate secret for location
 					var locationSecret string
 					secret, ok := cache.Secrets[pod.Namespace]
-					if ok {
+					if ok && secret.RoutingKey != nil {
 						// Guaranteed to be an API Key so no need to double check
-						locationSecret = base64.StdEncoding.EncodeToString(secret.Data)
+						locationSecret = base64.StdEncoding.EncodeToString(*secret.RoutingKey)
 					}
 
 					host.Locations[route.Incoming.Path] = &locationT{

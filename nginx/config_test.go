@@ -371,7 +371,7 @@ func TestGetConfCheckLocationWithSecret(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -421,7 +421,7 @@ func TestGetConfCheckLocationNoDefaultLocation(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -474,7 +474,7 @@ func TestGetConfCheckLocationTargetPath(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	targetPath := "/people"
 
@@ -502,7 +502,7 @@ func TestGetConfMissingNamespace(t *testing.T) {
 	resetConf()
 	cache := router.NewCache()
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
 		Namespace: "test-namespace",
@@ -542,8 +542,8 @@ func TestGetConfCheckMultipleNamespacesOneHostname(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
-	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", RoutingKey: &[]byte{'C', 'D', 'E'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -597,8 +597,8 @@ func TestGetConfDuplicateHostnameAndPath(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
-	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", RoutingKey: &[]byte{'C', 'D', 'E'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -646,7 +646,7 @@ func TestGetConfSecondPodUpdatesTargetPathFirstNil(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["other-pod1"] = &router.PodWithRoutes{
 		Name:      "other-pod1",
@@ -758,7 +758,7 @@ func TestGetConfDisabledHealthChecks(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	check := router.HealthCheck{
 		HTTPCheck:          true,
@@ -801,7 +801,7 @@ func TestGetConfEnabledHealthChecks(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	check := router.HealthCheck{
 		HTTPCheck:          true,
