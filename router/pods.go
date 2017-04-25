@@ -82,12 +82,14 @@ type Outgoing struct {
 	Port        string
 	TargetPath  *string
 	HealthCheck *HealthCheck
+	Weight      *uint
 }
 
 type pathAnnotation struct {
 	BasePath      string  `json:"basePath"`
 	ContainerPort string  `json:"containerPort"`
 	TargetPath    *string `json:"targetPath,omitempty"`
+	Weight        *uint   `json:"weight,omitempty"`
 }
 
 /*
@@ -162,6 +164,11 @@ func GetRoutes(config *Config, pod *api.Pod) []*Route {
 			continue
 		}
 
+		if path.Weight != nil && *path.Weight == 0 {
+			log.Printf("    Pod (%s) routing issue: weight (%d) is not valid\n", pod.Name, path.Weight)
+			continue
+		}
+
 		route := Route{
 			&Incoming{Path: path.BasePath},
 			&Outgoing{
@@ -169,6 +176,7 @@ func GetRoutes(config *Config, pod *api.Pod) []*Route {
 				Port:        path.ContainerPort,
 				TargetPath:  path.TargetPath,
 				HealthCheck: getHealthCheckFromPodPort(pod, int32(port)),
+				Weight:      path.Weight,
 			},
 		}
 

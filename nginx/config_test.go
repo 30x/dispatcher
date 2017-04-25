@@ -837,6 +837,62 @@ func TestGetConfEnabledHealthChecks(t *testing.T) {
 	}
 }
 
+func TestPodWithWeight(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	weight1 := uint(2)
+	cache.Pods["other-pod1"] = &router.PodWithRoutes{
+		Name:      "other-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.2", Port: "8080", Weight: &weight1},
+		}},
+	}
+
+	weight2 := uint(5)
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.3", Port: "8080", Weight: &weight2},
+		}},
+	}
+
+	cache.Pods["some-pod2"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	if strings.Count(doc, "server 1.2.3.2:8080 weight=2;") != 1 {
+		t.Fatalf("Pod1 with weight 2 to be present")
+	}
+
+	if strings.Count(doc, "server 1.2.3.3:8080 weight=5;") != 1 {
+		t.Fatalf("Pod2 with weight 5 to be present")
+	}
+
+	if strings.Count(doc, "server 1.2.3.4:8080;") != 1 {
+		t.Fatalf("Pod3 without weght to be present")
+	}
+
+}
+
 func TestProcessSSLOptions(t *testing.T) {
 	resetConf()
 	cache := router.NewCache()

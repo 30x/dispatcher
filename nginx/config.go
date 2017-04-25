@@ -29,7 +29,7 @@ http {
     keepalive 1024;
     {{range $server := $upstream.Servers}}
     # Pod {{$server.Pod.Name}} (namespace: {{$server.Pod.Namespace}})
-    server {{$server.Target}};
+    server {{$server.Target}}{{if $server.Weight}} weight={{$server.Weight}}{{end}};
     {{if and $.Config.Nginx.EnableHealthChecks $upstream.HealthCheck }}
     {{template "upstream-healthcheck" $upstream.HealthCheck}}
     {{- end}}
@@ -209,6 +209,7 @@ type upstreamT struct {
 
 type serverT struct {
 	Pod    *router.PodWithRoutes
+	Weight *uint
 	Target string
 }
 
@@ -445,6 +446,7 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 					upstream.Servers = append(upstream.Servers, &serverT{
 						Pod:    pod,
 						Target: target,
+						Weight: route.Outgoing.Weight,
 					})
 
 					// Sort to make finding your pods in an upstream easier
@@ -465,6 +467,7 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 							&serverT{
 								Pod:    pod,
 								Target: target,
+								Weight: route.Outgoing.Weight,
 							},
 						},
 					}
