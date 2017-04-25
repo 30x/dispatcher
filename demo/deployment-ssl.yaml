@@ -4,7 +4,7 @@ metadata:
   creationTimestamp: null
   name: test-namespace
   annotations:
-    edge/hosts: |
+    github.com/30x.dispatcher.hosts: |
       {
         "secure.dev": {
           "ssl": {
@@ -14,9 +14,9 @@ metadata:
         }
       }
   labels:
-    edge/routable: "true"
-    edge/org: "example"
-    edge/env: "test"
+    github.com/30x.dispatcher.routable: "true"
+    github.com/30x.dispatcher.org: "example"
+    github.com/30x.dispatcher.env: "test"
 
 ---
 
