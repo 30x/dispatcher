@@ -49,27 +49,17 @@ type Namespace struct {
 	hash uint64
 }
 
-/*
-{"cert":
-	{"valueFrom":
-		{"secretKeyRef" :
-			{"key":"turbo-apigee-ssl.crt"
-			}
-		}
-	}
-}
-*/
-// SecretRef ...
+// SecretRef ref to secret field
 type SecretRef struct {
 	Key string `json:"key"`
 }
 
-// ValueFrom ...
+// ValueFrom specify reference to a secret
 type ValueFrom struct {
 	SecretKeyRef *SecretRef `json:"secretKeyRef,omitempty"`
 }
 
-// OptionValue ...
+// OptionValue value from ref
 type OptionValue struct {
 	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
