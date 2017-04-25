@@ -39,7 +39,7 @@ http {
 
   {{range $host, $server := .Hosts}}
   server {
-    listen {{if $server.SSL -}}{{$.Config.Nginx.SSLPort}}{{else}}{{$.Config.Nginx.Port}}{{end}};
+    listen {{if $server.SSL -}}{{$.Config.Nginx.SSLPort}} ssl{{else}}{{$.Config.Nginx.Port}}{{end}};
     server_name {{$host}};
     {{if $server.SSL -}} {{template "ssl-host" $server.SSL}}{{- end}}
     {{if $server.NeedsDefaultLocation -}} {{template "default-location" $}}{{- end}}
@@ -65,6 +65,7 @@ http {
   {{end}}
 
   {{template "default-server" .}}
+  {{if .Config.Nginx.SSLEnabled}}{{template "default-ssl-server" .}}{{end}}
 }
 `
 
@@ -80,6 +81,26 @@ events {
   # Default server that will just close the connection as if there was no server available
   server {
     listen {{.Config.Nginx.Port}} default_server;
+
+    location = {{.Config.Nginx.StatusPath}} {
+      return 200;
+    }
+
+    location / {
+      return 444;
+    }
+  }
+{{- end}}
+
+{{define "default-ssl-server" -}}
+  # Default server that will just close the connection as if there was no server available
+  server {
+    listen {{.Config.Nginx.SSLPort}} default_server ssl;
+    # SSL Options
+    ssl_ciphers HIGH:!aNULL:!MD5:!DH+3DES:!kEDH;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_certificate {{.Config.Nginx.SSLCert}};
+    ssl_certificate_key {{.Config.Nginx.SSLKey}};
 
     location = {{.Config.Nginx.StatusPath}} {
       return 200;
@@ -325,6 +346,13 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 
 				// Convert ssl options
 				if opts.SSLOptions != nil {
+
+					// If ssl is disabled do not route pods/ns
+					if !config.Nginx.SSLEnabled {
+						log.Printf("  Nginx Config: Found ssl enabled hostname (%s) but ssl is disabled.\n", hostName)
+						continue
+					}
+
 					sslOpts, err := processSSLOptions(ns.Name, hostName, opts.SSLOptions, cache, config)
 					if err != nil {
 						log.Printf("  Nginx Config: Invalid ssl options for host %s: %v\n", hostName, err)

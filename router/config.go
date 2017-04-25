@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,10 @@ const (
 	ErrMsgTmplInvalidServerReturnURL = "%s is an invalid url for default server return %v"
 	//ErrMsgTmplInvalidPath is the error message for an invalid path
 	ErrMsgTmplInvalidPath = "%s is an invalid path"
+	//ErrMsgTmplMissingSSLKey is the error message for missing ssl key
+	ErrMsgTmplMissingSSLKey = "must provide a ssl key when ssl cert is provided"
+	// ErrMsgTmplSSLCertMissing error for when ssl cert/key does not exist on disk
+	ErrMsgTmplSSLCertMissing = "ssl cert does not exist %s"
 )
 
 /*
@@ -72,6 +77,12 @@ type NginxConfig struct {
 	SSLPort int
 	// SSLCertificateDir path to store certificates
 	SSLCertificateDir string
+	// SSLCert the default ssl cert used for all request that don't match a valid ssl host
+	SSLCert string
+	// SSLKey the default ssl cert key used for all request that don't match a valid ssl host
+	SSLKey string
+	// SSLEnabled flag to enable/disable ssl support, set by ConfigFromEnv
+	SSLEnabled bool
 	// Default location return if request does not match any patjs, Defaults: 404
 	DefaultLocationReturn string
 	// RunInMockMode enables starting/stopping nginx if disabled. In mock mode starting/stopping is ignored.
@@ -142,6 +153,10 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.Port", "PORT", "80")
 	// The port that nginx will listen on for ssl connections
 	addConfig("Nginx.SSLPort", "SSL_PORT", "443")
+	// SSLKey the default ssl cert used for all request that don't match a valid ssl host
+	addConfig("Nginx.SSLCert", "SSL_CERT", "")
+	// SSLKey the default ssl cert key used for all request that don't match a valid ssl host
+	addConfig("Nginx.SSLKey", "SSL_KEY", "")
 	// Dir to write ssl certs to
 	addConfig("Nginx.SSLCertificateDir", "SSL_CERT_DIR", "/etc/nginx/ssl")
 	// If request does not match any paths nginx will return a status code or uri, defaults to 404
@@ -205,6 +220,26 @@ func ConfigFromEnv() (*Config, error) {
 	// Validate nginx status path
 	if !validatePath(config.Nginx.StatusPath) {
 		return nil, fmt.Errorf(ErrMsgTmplInvalidPath, config.Nginx.StatusPath)
+	}
+
+	// Validate SSL Cert
+	if config.Nginx.SSLCert != "" {
+		// If cert if provided must have key
+		if config.Nginx.SSLKey == "" {
+			return nil, fmt.Errorf(ErrMsgTmplMissingSSLKey)
+		}
+
+		// check if ssl cert exists
+		if _, err := os.Stat(config.Nginx.SSLCert); os.IsNotExist(err) {
+			return nil, fmt.Errorf(ErrMsgTmplSSLCertMissing, config.Nginx.SSLCert)
+		}
+
+		// check if ssl key exists
+		if _, err := os.Stat(config.Nginx.SSLCert); os.IsNotExist(err) {
+			return nil, fmt.Errorf(ErrMsgTmplSSLCertMissing, config.Nginx.SSLKey)
+		}
+
+		config.Nginx.SSLEnabled = true
 	}
 
 	return &config, nil

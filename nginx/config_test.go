@@ -971,7 +971,9 @@ func TestProcessSSLOptions(t *testing.T) {
 func TestSSLConfig(t *testing.T) {
 	resetConf()
 
-	config.Nginx.EnableHealthChecks = true
+	config.Nginx.SSLEnabled = true
+	config.Nginx.SSLCert = "path/to/cert.crt"
+	config.Nginx.SSLKey = "path/to/cert.key"
 
 	cache := router.NewCache()
 
@@ -1012,12 +1014,20 @@ func TestSSLConfig(t *testing.T) {
 	doc := GetConf(config, cache)
 
 	// Listening on port 443
-	if strings.Count(doc, "listen 443;") != 1 {
+	if strings.Count(doc, "listen 443 ssl;") != 1 {
 		t.Fatalf("Expected one virtual host to listen on 443")
 	}
 
 	if strings.Count(doc, "listen 80 default_server;") != 1 {
 		t.Fatalf("Expected one virtual host to listen on 80")
+	}
+
+	if strings.Count(doc, "listen 443 default_server ssl;") != 1 {
+		t.Fatalf("Expected default ssl server to exists")
+	}
+
+	if strings.Count(doc, "listen 443 default_server ssl;") != 1 {
+		t.Fatalf("Expected default ssl server to exists")
 	}
 
 	clientCert := fmt.Sprintf("%s/%s/clientCertificate.crt", config.Nginx.SSLCertificateDir, "api.ex.net")
