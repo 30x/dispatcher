@@ -12,6 +12,7 @@ func resetEnv() {
 		"HOSTS_ANNOTATION",
 		"DEFAULT_SERVER_RETURN",
 		"PORT",
+		"SSL_PORT",
 	} {
 		os.Unsetenv(name)
 	}
@@ -48,6 +49,12 @@ func TestConfigFromEnvInvailidPort(t *testing.T) {
 	resetEnv()
 	os.Setenv("PORT", "-1")
 	_, err := ConfigFromEnv()
+	if err == nil {
+		t.Fatal("Error should not nil")
+	}
+
+	os.Setenv("SSL_PORT", "-1")
+	_, err = ConfigFromEnv()
 	if err == nil {
 		t.Fatal("Error should not nil")
 	}

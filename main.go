@@ -102,6 +102,7 @@ func main() {
 
 	// Don't write nginx conf when not in cluster
 	nginx.RunInMockMode = !(kube.RunningInCluster())
+	config.Nginx.RunInMockMode = nginx.RunInMockMode
 
 	// Start nginx with the default configuration to start nginx as a daemon
 	nginx.StartServer(nginx.GetConf(config, router.NewCache()))

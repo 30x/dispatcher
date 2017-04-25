@@ -68,8 +68,14 @@ type NginxConfig struct {
 	MaxClientBodySize string
 	// The port that nginx will listen on
 	Port int
+	// The port that nginx will listen for ssl connections
+	SSLPort int
+	// SSLCertificateDir path to store certificates
+	SSLCertificateDir string
 	// Default location return if request does not match any patjs, Defaults: 404
 	DefaultLocationReturn string
+	// RunInMockMode enables starting/stopping nginx if disabled. In mock mode starting/stopping is ignored.
+	RunInMockMode bool
 }
 
 // addConfig adds a default and env binding to viper
@@ -134,6 +140,10 @@ func ConfigFromEnv() (*Config, error) {
 	addConfig("Nginx.MaxClientBodySize", "NGINX_MAX_CLIENT_BODY_SIZE", "0")
 	// The port that nginx will listen on
 	addConfig("Nginx.Port", "PORT", "80")
+	// The port that nginx will listen on for ssl connections
+	addConfig("Nginx.SSLPort", "SSL_PORT", "443")
+	// Dir to write ssl certs to
+	addConfig("Nginx.SSLCertificateDir", "SSL_CERT_DIR", "/etc/nginx/ssl")
 	// If request does not match any paths nginx will return a status code or uri, defaults to 404
 	addConfig("Nginx.DefaultLocationReturn", "DEFAULT_LOCATION_RETURN", "404")
 
@@ -155,8 +165,13 @@ func ConfigFromEnv() (*Config, error) {
 	}
 
 	// Validate Nginx port
-	if err != nil || !utils.IsValidPort(config.Nginx.Port) {
+	if !utils.IsValidPort(config.Nginx.Port) {
 		return nil, fmt.Errorf(ErrMsgTmplInvalidPort, config.Nginx.Port)
+	}
+
+	// Validate Nginx port
+	if !utils.IsValidPort(config.Nginx.SSLPort) {
+		return nil, fmt.Errorf(ErrMsgTmplInvalidPort, config.Nginx.SSLPort)
 	}
 
 	// Validate label selectors

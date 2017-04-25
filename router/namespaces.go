@@ -59,23 +59,28 @@ type Namespace struct {
 	}
 }
 */
-type secretRef struct {
+// SecretRef ...
+type SecretRef struct {
 	Key string `json:"key"`
 }
-type valueFrom struct {
-	SecretKeyRef *secretRef `json:"secretKeyRef,omitempty"`
+
+// ValueFrom ...
+type ValueFrom struct {
+	SecretKeyRef *SecretRef `json:"secretKeyRef,omitempty"`
 }
-type optionValue struct {
-	ValueFrom *valueFrom `json:"valueFrom,omitempty"`
+
+// OptionValue ...
+type OptionValue struct {
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
 
 /*
 SSLOptions contains options for the host
 */
 type SSLOptions struct {
-	Certifacate      optionValue  `json:"certificate"`
-	Key              optionValue  `json:"certificateKey"`
-	ClientCertficate *optionValue `json:"clientCertificate,omitempty"`
+	Certificate      OptionValue  `json:"certificate"`
+	Key              OptionValue  `json:"certificateKey"`
+	ClientCertficate *OptionValue `json:"clientCertificate,omitempty"`
 }
 
 /*
@@ -243,10 +248,10 @@ func getHostsFromNamespace(config *Config, namespace *api.Namespace) map[string]
 }
 
 func validSSLOptions(opts *SSLOptions) error {
-	if opts.Certifacate.ValueFrom == nil {
+	if opts.Certificate.ValueFrom == nil {
 		return fmt.Errorf("certificate option missing valueFrom")
 	}
-	if opts.Certifacate.ValueFrom.SecretKeyRef == nil {
+	if opts.Certificate.ValueFrom.SecretKeyRef == nil {
 		return fmt.Errorf("certificate option missing secretKeyRef")
 	}
 

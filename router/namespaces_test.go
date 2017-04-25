@@ -271,21 +271,21 @@ func TestGetHostsFromNamespaceSSLOpts(t *testing.T) {
 	hosts := map[string]HostOptions{
 		"secure-api.com": HostOptions{
 			SSLOptions: &SSLOptions{
-				Certifacate: optionValue{&valueFrom{&secretRef{"cert1"}}},
-				Key:         optionValue{&valueFrom{&secretRef{"key1"}}},
+				Certificate: OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 			},
 		},
 		"client.valid.com": HostOptions{
 			SSLOptions: &SSLOptions{
-				Certifacate:      optionValue{&valueFrom{&secretRef{"cert1"}}},
-				Key:              optionValue{&valueFrom{&secretRef{"key1"}}},
-				ClientCertficate: &optionValue{&valueFrom{&secretRef{"clientCA"}}},
+				Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+				ClientCertficate: &OptionValue{&ValueFrom{&SecretRef{"clientCA"}}},
 			},
 		},
 		"ssl-invalid.com": HostOptions{
 			SSLOptions: &SSLOptions{
-				Certifacate: optionValue{&valueFrom{&secretRef{"cert1"}}},
-				Key:         optionValue{},
+				Certificate: OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:         OptionValue{},
 			},
 		},
 	}
@@ -305,8 +305,8 @@ func TestGetHostsFromNamespaceSSLOpts(t *testing.T) {
 			t.Fatalf("Expected output to have host %s", host)
 		}
 
-		if hostOut.SSLOptions.Certifacate.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.Certifacate.ValueFrom.SecretKeyRef.Key {
-			t.Fatalf("Expected Certifacate key to match")
+		if hostOut.SSLOptions.Certificate.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.Certificate.ValueFrom.SecretKeyRef.Key {
+			t.Fatalf("Expected Certificate key to match")
 		}
 		if hostOut.SSLOptions.Key.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.Key.ValueFrom.SecretKeyRef.Key {
 			t.Fatalf("Expected Key key to match")
@@ -323,56 +323,56 @@ func TestGetHostsFromNamespaceSSLOpts(t *testing.T) {
 
 func TestValidSSLOptions(t *testing.T) {
 	optValid := &SSLOptions{
-		Certifacate:      optionValue{&valueFrom{&secretRef{"cert1"}}},
-		Key:              optionValue{&valueFrom{&secretRef{"key1"}}},
-		ClientCertficate: &optionValue{&valueFrom{&secretRef{"key1"}}},
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 	}
 	if err := validSSLOptions(optValid); err != nil {
 		t.Fatalf("Expected valid options return nil was %v", err)
 	}
 
 	optCertMissingSecret := &SSLOptions{
-		Certifacate: optionValue{&valueFrom{}},
-		Key:         optionValue{&valueFrom{&secretRef{"key1"}}},
+		Certificate: OptionValue{&ValueFrom{}},
+		Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 	}
 	if validSSLOptions(optCertMissingSecret) == nil {
-		t.Fatalf("Certifacate missing secretRef should return error")
+		t.Fatalf("Certificate missing SecretRef should return error")
 	}
 	optCertMissingValue := &SSLOptions{
-		Certifacate: optionValue{},
-		Key:         optionValue{&valueFrom{&secretRef{"key1"}}},
+		Certificate: OptionValue{},
+		Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 	}
 	if validSSLOptions(optCertMissingValue) == nil {
-		t.Fatalf("Certifacate missing valueFrom should return error")
+		t.Fatalf("Certificate missing ValueFrom should return error")
 	}
 
 	optKeyMissingSecret := &SSLOptions{
-		Key:         optionValue{&valueFrom{}},
-		Certifacate: optionValue{&valueFrom{&secretRef{"key1"}}},
+		Key:         OptionValue{&ValueFrom{}},
+		Certificate: OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 	}
 	if validSSLOptions(optKeyMissingSecret) == nil {
-		t.Fatalf("Key missing secretRef should return error")
+		t.Fatalf("Key missing SecretRef should return error")
 	}
 	optKeyMissingValue := &SSLOptions{
-		Key:         optionValue{},
-		Certifacate: optionValue{&valueFrom{&secretRef{"key1"}}},
+		Key:         OptionValue{},
+		Certificate: OptionValue{&ValueFrom{&SecretRef{"key1"}}},
 	}
 	if validSSLOptions(optKeyMissingValue) == nil {
-		t.Fatalf("Key missing valueFrom should return error")
+		t.Fatalf("Key missing ValueFrom should return error")
 	}
 
 	optClientMissingSecret := &SSLOptions{
-		Certifacate:      optionValue{&valueFrom{&secretRef{"cert1"}}},
-		Key:              optionValue{&valueFrom{&secretRef{"key1"}}},
-		ClientCertficate: &optionValue{&valueFrom{}},
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{&ValueFrom{}},
 	}
 	if validSSLOptions(optClientMissingSecret) == nil {
-		t.Fatalf("ClientCertficate missing secretRef should return error")
+		t.Fatalf("ClientCertficate missing SecretRef should return error")
 	}
 	optClientMissingValue := &SSLOptions{
-		Certifacate:      optionValue{&valueFrom{&secretRef{"cert1"}}},
-		Key:              optionValue{&valueFrom{&secretRef{"key1"}}},
-		ClientCertficate: &optionValue{},
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{},
 	}
 	if validSSLOptions(optClientMissingValue) == nil {
 		t.Fatalf("ClientCertficate missing valueFrom should return error")
