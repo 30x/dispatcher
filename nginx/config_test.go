@@ -4,6 +4,7 @@ import (
 	//	"bytes"
 	//	"encoding/base64"
 	"bytes"
+	"fmt"
 	"github.com/30x/dispatcher/router"
 	"log"
 	"strings"
@@ -25,6 +26,7 @@ func resetConf() {
 	}
 
 	config = envConfig
+	config.Nginx.RunInMockMode = true
 }
 
 func getConfig() templateDataT {
@@ -371,7 +373,7 @@ func TestGetConfCheckLocationWithSecret(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -421,7 +423,7 @@ func TestGetConfCheckLocationNoDefaultLocation(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -474,7 +476,7 @@ func TestGetConfCheckLocationTargetPath(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	targetPath := "/people"
 
@@ -502,7 +504,7 @@ func TestGetConfMissingNamespace(t *testing.T) {
 	resetConf()
 	cache := router.NewCache()
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
 		Namespace: "test-namespace",
@@ -542,8 +544,8 @@ func TestGetConfCheckMultipleNamespacesOneHostname(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
-	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", RoutingKey: &[]byte{'C', 'D', 'E'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -597,8 +599,8 @@ func TestGetConfDuplicateHostnameAndPath(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
-	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", Data: []byte{'C', 'D', 'E'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
+	cache.Secrets["other-namespace"] = &router.Secret{Namespace: "other-namespace", RoutingKey: &[]byte{'C', 'D', 'E'}}
 
 	cache.Pods["some-pod1"] = &router.PodWithRoutes{
 		Name:      "some-pod1",
@@ -646,7 +648,7 @@ func TestGetConfSecondPodUpdatesTargetPathFirstNil(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	cache.Pods["other-pod1"] = &router.PodWithRoutes{
 		Name:      "other-pod1",
@@ -758,7 +760,7 @@ func TestGetConfDisabledHealthChecks(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	check := router.HealthCheck{
 		HTTPCheck:          true,
@@ -801,7 +803,7 @@ func TestGetConfEnabledHealthChecks(t *testing.T) {
 		Environment:  "test",
 	}
 
-	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", Data: []byte{'A', 'B', 'C'}}
+	cache.Secrets["test-namespace"] = &router.Secret{Namespace: "test-namespace", RoutingKey: &[]byte{'A', 'B', 'C'}}
 
 	check := router.HealthCheck{
 		HTTPCheck:          true,
@@ -833,4 +835,216 @@ func TestGetConfEnabledHealthChecks(t *testing.T) {
 	if strings.Count(doc, partialDoc.String()) != 1 {
 		t.Fatalf("Expected upstream to contain healthcheck partial")
 	}
+}
+
+func TestProcessSSLOptions(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+	namespace := "test-ns"
+	hostname := "test.com"
+
+	cache.Secrets[namespace] = &router.Secret{
+		Namespace:  namespace,
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"cert1": []byte{'A', 'B', 'C'},
+			"key1":  []byte{'A', 'B', 'C'},
+		},
+	}
+
+	sslOpts := &router.SSLOptions{
+		Certificate: router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:         router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+	}
+
+	output, err := processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err != nil {
+		t.Fatalf("Expected error to be nil %v", err)
+	}
+
+	if output.Certificate != fmt.Sprintf("%s/%s/certificate.crt", config.Nginx.SSLCertificateDir, hostname) {
+		t.Fatalf("Expected Certificate to be %s was %s", fmt.Sprintf("%s/%s/certificate.crt", config.Nginx.SSLCertificateDir, hostname), output.Certificate)
+	}
+	if output.Key != fmt.Sprintf("%s/%s/certificate.key", config.Nginx.SSLCertificateDir, hostname) {
+		t.Fatalf("Expected Key to be %s was %s", fmt.Sprintf("%s/%s/certificate.key", config.Nginx.SSLCertificateDir, hostname), output.Certificate)
+	}
+
+	if output.ClientCertificate != nil {
+		t.Fatalf("Expected client cert to be nil")
+	}
+
+	sslOpts = &router.SSLOptions{
+		Certificate:      router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:              router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+		ClientCertficate: &router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert2"}}},
+	}
+	cache.Secrets[namespace] = &router.Secret{
+		Namespace:  namespace,
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"cert1": []byte{'A', 'B', 'C'},
+			"key1":  []byte{'A', 'B', 'C'},
+			"cert2": []byte{'A', 'B', 'C'},
+		},
+	}
+	output, err = processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err != nil {
+		t.Fatalf("Expected error to be nil %v", err)
+	}
+
+	if output.Certificate != fmt.Sprintf("%s/%s/certificate.crt", config.Nginx.SSLCertificateDir, hostname) {
+		t.Fatalf("Expected Certificate to be %s was %s", fmt.Sprintf("%s/%s/certificate.crt", config.Nginx.SSLCertificateDir, hostname), output.Certificate)
+	}
+	if output.Key != fmt.Sprintf("%s/%s/certificate.key", config.Nginx.SSLCertificateDir, hostname) {
+		t.Fatalf("Expected Key to be %s was %s", fmt.Sprintf("%s/%s/certificate.key", config.Nginx.SSLCertificateDir, hostname), output.Certificate)
+	}
+
+	if *output.ClientCertificate == fmt.Sprintf("%s/%s/client.crt", config.Nginx.SSLCertificateDir, hostname) {
+		t.Fatalf("Expected CleintCert to be %s was %s", fmt.Sprintf("%s/%s/client.crt", config.Nginx.SSLCertificateDir, hostname), *output.ClientCertificate)
+	}
+
+	sslOpts = &router.SSLOptions{
+		Certificate: router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:         router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+	}
+	cache.Secrets[namespace] = &router.Secret{
+		Namespace:  namespace,
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"key1": []byte{'A', 'B', 'C'},
+		},
+	}
+
+	_, err = processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err == nil {
+		t.Fatalf("Expected error to not be nil")
+	}
+
+	sslOpts = &router.SSLOptions{
+		Certificate: router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:         router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+	}
+	cache.Secrets[namespace] = &router.Secret{
+		Namespace:  namespace,
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"cert1": []byte{'A', 'B', 'C'},
+		},
+	}
+
+	_, err = processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err == nil {
+		t.Fatalf("Expected error to not be nil")
+	}
+
+	sslOpts = &router.SSLOptions{
+		Certificate: router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:         router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+	}
+	delete(cache.Secrets, namespace)
+
+	_, err = processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err == nil {
+		t.Fatalf("Expected error to not be nil")
+	}
+
+	sslOpts = &router.SSLOptions{
+		Certificate:      router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert1"}}},
+		Key:              router.OptionValue{&router.ValueFrom{&router.SecretRef{"key1"}}},
+		ClientCertficate: &router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert2"}}},
+	}
+	cache.Secrets[namespace] = &router.Secret{
+		Namespace:  namespace,
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"cert1": []byte{'A', 'B', 'C'},
+			"key1":  []byte{'A', 'B', 'C'},
+		},
+	}
+
+	_, err = processSSLOptions(namespace, hostname, sslOpts, cache, config)
+	if err == nil {
+		t.Fatalf("Expected error to not be nil")
+	}
+}
+
+func TestSSLConfig(t *testing.T) {
+	resetConf()
+
+	config.Nginx.SSLEnabled = true
+	config.Nginx.SSLCert = "path/to/cert.crt"
+	config.Nginx.SSLKey = "path/to/cert.key"
+
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name: "test-namespace",
+		Hosts: map[string]router.HostOptions{
+			"api.ex.net": router.HostOptions{
+				SSLOptions: &router.SSLOptions{
+					Certificate:      router.OptionValue{&router.ValueFrom{&router.SecretRef{"cert"}}},
+					Key:              router.OptionValue{&router.ValueFrom{&router.SecretRef{"key"}}},
+					ClientCertficate: &router.OptionValue{&router.ValueFrom{&router.SecretRef{"client"}}},
+				},
+			},
+		},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Secrets["test-namespace"] = &router.Secret{
+		Namespace:  "test-namespace",
+		RoutingKey: &[]byte{'A', 'B', 'C'},
+		Fields: map[string][]byte{
+			"cert":   []byte{'A', 'B', 'C'},
+			"key":    []byte{'A', 'B', 'C'},
+			"client": []byte{'A', 'B', 'C'},
+		},
+	}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	// Listening on port 443
+	if strings.Count(doc, "listen 443 ssl;") != 1 {
+		t.Fatalf("Expected one virtual host to listen on 443")
+	}
+
+	if strings.Count(doc, "listen 80 default_server;") != 1 {
+		t.Fatalf("Expected one virtual host to listen on 80")
+	}
+
+	if strings.Count(doc, "listen 443 default_server ssl;") != 1 {
+		t.Fatalf("Expected default ssl server to exists")
+	}
+
+	if strings.Count(doc, "listen 443 default_server ssl;") != 1 {
+		t.Fatalf("Expected default ssl server to exists")
+	}
+
+	clientCert := fmt.Sprintf("%s/%s/clientCertificate.crt", config.Nginx.SSLCertificateDir, "api.ex.net")
+
+	sslOpts := sslOptions{
+		Certificate:       fmt.Sprintf("%s/%s/certificate.crt", config.Nginx.SSLCertificateDir, "api.ex.net"),
+		Key:               fmt.Sprintf("%s/%s/certificate.key", config.Nginx.SSLCertificateDir, "api.ex.net"),
+		ClientCertificate: &clientCert,
+	}
+
+	var partialDoc bytes.Buffer
+	if err := nginxTemplate.ExecuteTemplate(&partialDoc, "ssl-host", sslOpts); err != nil {
+		t.Fatalf("Failed to write template %v", err)
+	}
+
+	if strings.Count(doc, partialDoc.String()) != 1 {
+		t.Fatalf("Expected virtual host to have ssl config")
+	}
+
 }

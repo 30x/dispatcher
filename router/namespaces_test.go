@@ -263,3 +263,118 @@ func TestNamespacesCacheCompare(t *testing.T) {
 		t.Fatalf("Namespace4 should not match anything that is in cache, namespace not added.")
 	}
 }
+
+// Test getHostsFromNamespace hosts with ssl options
+func TestGetHostsFromNamespaceSSLOpts(t *testing.T) {
+	k8sNamespace := genK8sNamespace("my-namespace", "org", "test", genHostsJSON(""))
+
+	hosts := map[string]HostOptions{
+		"secure-api.com": HostOptions{
+			SSLOptions: &SSLOptions{
+				Certificate: OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+			},
+		},
+		"client.valid.com": HostOptions{
+			SSLOptions: &SSLOptions{
+				Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+				ClientCertficate: &OptionValue{&ValueFrom{&SecretRef{"clientCA"}}},
+			},
+		},
+		"ssl-invalid.com": HostOptions{
+			SSLOptions: &SSLOptions{
+				Certificate: OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+				Key:         OptionValue{},
+			},
+		},
+	}
+
+	b, _ := json.Marshal(hosts)
+	// Update hosts annotation
+	k8sNamespace.Annotations[config.NamespaceHostsAnnotation] = string(b)
+	output := getHostsFromNamespace(config, &k8sNamespace)
+
+	for host, opts := range hosts {
+		if host == "ssl-invalid.com" {
+			continue
+		}
+
+		hostOut, ok := output[host]
+		if !ok {
+			t.Fatalf("Expected output to have host %s", host)
+		}
+
+		if hostOut.SSLOptions.Certificate.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.Certificate.ValueFrom.SecretKeyRef.Key {
+			t.Fatalf("Expected Certificate key to match")
+		}
+		if hostOut.SSLOptions.Key.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.Key.ValueFrom.SecretKeyRef.Key {
+			t.Fatalf("Expected Key key to match")
+		}
+
+		if hostOut.SSLOptions.ClientCertficate != nil {
+			if hostOut.SSLOptions.ClientCertficate.ValueFrom.SecretKeyRef.Key != opts.SSLOptions.ClientCertficate.ValueFrom.SecretKeyRef.Key {
+				t.Fatalf("Expected ClientCertficate key to match")
+			}
+		}
+	}
+
+}
+
+func TestValidSSLOptions(t *testing.T) {
+	optValid := &SSLOptions{
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+	}
+	if err := validSSLOptions(optValid); err != nil {
+		t.Fatalf("Expected valid options return nil was %v", err)
+	}
+
+	optCertMissingSecret := &SSLOptions{
+		Certificate: OptionValue{&ValueFrom{}},
+		Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+	}
+	if validSSLOptions(optCertMissingSecret) == nil {
+		t.Fatalf("Certificate missing SecretRef should return error")
+	}
+	optCertMissingValue := &SSLOptions{
+		Certificate: OptionValue{},
+		Key:         OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+	}
+	if validSSLOptions(optCertMissingValue) == nil {
+		t.Fatalf("Certificate missing ValueFrom should return error")
+	}
+
+	optKeyMissingSecret := &SSLOptions{
+		Key:         OptionValue{&ValueFrom{}},
+		Certificate: OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+	}
+	if validSSLOptions(optKeyMissingSecret) == nil {
+		t.Fatalf("Key missing SecretRef should return error")
+	}
+	optKeyMissingValue := &SSLOptions{
+		Key:         OptionValue{},
+		Certificate: OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+	}
+	if validSSLOptions(optKeyMissingValue) == nil {
+		t.Fatalf("Key missing ValueFrom should return error")
+	}
+
+	optClientMissingSecret := &SSLOptions{
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{&ValueFrom{}},
+	}
+	if validSSLOptions(optClientMissingSecret) == nil {
+		t.Fatalf("ClientCertficate missing SecretRef should return error")
+	}
+	optClientMissingValue := &SSLOptions{
+		Certificate:      OptionValue{&ValueFrom{&SecretRef{"cert1"}}},
+		Key:              OptionValue{&ValueFrom{&SecretRef{"key1"}}},
+		ClientCertficate: &OptionValue{},
+	}
+	if validSSLOptions(optClientMissingValue) == nil {
+		t.Fatalf("ClientCertficate missing valueFrom should return error")
+	}
+}

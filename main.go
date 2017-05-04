@@ -78,7 +78,7 @@ func initController(config *router.Config, kubeClient *kubernetes.Clientset) (*r
 	}
 
 	// Generate the nginx configuration and restart nginx
-	nginx.RestartServer(nginx.GetConf(config, cache), false)
+	nginx.RestartServer(config, nginx.GetConf(config, cache), false)
 
 	return cache, resourceTypes
 }
@@ -101,10 +101,10 @@ func main() {
 	}
 
 	// Don't write nginx conf when not in cluster
-	nginx.RunInMockMode = !(kube.RunningInCluster())
+	config.Nginx.RunInMockMode = !(kube.RunningInCluster())
 
 	// Start nginx with the default configuration to start nginx as a daemon
-	nginx.StartServer(nginx.GetConf(config, router.NewCache()))
+	nginx.StartServer(config, nginx.GetConf(config, router.NewCache()))
 
 	// Loop forever
 	for {
@@ -160,7 +160,7 @@ func main() {
 				//  If nginx needs restart
 				if needsRestart {
 					log.Println("Nginx needs restart.")
-					nginx.RestartServer(nginx.GetConf(config, cache), false)
+					nginx.RestartServer(config, nginx.GetConf(config, cache), false)
 				}
 
 				// Clear events and reset the wait time for the event window

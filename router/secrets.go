@@ -5,7 +5,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/watch"
-	"log"
 )
 
 /*
@@ -20,8 +19,10 @@ type SecretWatchableSet struct {
 Secret struct implements a WatchableResource interface and contains the Namespace name and Data inside the secret
 */
 type Secret struct {
-	Namespace string
-	Data      []byte
+	Namespace  string
+	RoutingKey *[]byte
+	Fields     map[string][]byte // raw data values for each field in secret
+	hash       uint64
 }
 
 /*
@@ -35,8 +36,17 @@ func (s Secret) ID() string {
 Hash returns a fnv hasve of the Secret Data
 */
 func (s Secret) Hash() uint64 {
+	return s.hash
+}
+
+func calculateSecretHash(s *Secret) uint64 {
 	h := fnv.New64()
-	h.Write(s.Data)
+	if s.RoutingKey != nil {
+		h.Write(*s.RoutingKey)
+	}
+	for _, v := range s.Fields {
+		h.Write(v)
+	}
 	return h.Sum64()
 }
 
@@ -76,12 +86,7 @@ func (s SecretWatchableSet) Get() ([]WatchableResource, string, error) {
 	// Filter secrets that have the APIKeySecret name
 	for _, secret := range k8sSecrets.Items {
 		if secret.Name == s.Config.APIKeySecret {
-			_, ok := secret.Data[s.Config.APIKeySecretDataField]
-			if ok {
-				secrets = append(secrets, s.ConvertToModel(&secret))
-			} else {
-				log.Printf("    Router secret for namespace (%s) is not usable: Missing '%s' key\n", secret.Namespace, s.Config.APIKeySecretDataField)
-			}
+			secrets = append(secrets, s.ConvertToModel(&secret))
 		}
 	}
 
@@ -95,8 +100,16 @@ func (s SecretWatchableSet) ConvertToModel(in interface{}) WatchableResource {
 	k8Secret := in.(*api.Secret)
 	secret := &Secret{
 		Namespace: k8Secret.Namespace,
-		Data:      k8Secret.Data[s.Config.APIKeySecretDataField],
+		Fields:    k8Secret.Data,
 	}
+
+	if routingKey, ok := k8Secret.Data[s.Config.APIKeySecretDataField]; ok {
+		secret.RoutingKey = &routingKey
+	}
+
+	// Pre calculdate hash
+	secret.hash = calculateSecretHash(secret)
+
 	return secret
 }
 
@@ -108,8 +121,7 @@ func (s SecretWatchableSet) Watchable(in interface{}) bool {
 	if k8Secret.Name != s.Config.APIKeySecret {
 		return false
 	}
-	_, ok := k8Secret.Data[s.Config.APIKeySecretDataField]
-	return ok
+	return true
 }
 
 /*

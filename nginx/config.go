@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/30x/dispatcher/router"
 	"hash/fnv"
+	"io/ioutil"
 	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -37,8 +39,9 @@ http {
 
   {{range $host, $server := .Hosts}}
   server {
-    listen {{$.Config.Nginx.Port}};
+    listen {{if $server.SSL -}}{{$.Config.Nginx.SSLPort}} ssl{{else}}{{$.Config.Nginx.Port}}{{end}};
     server_name {{$host}};
+    {{if $server.SSL -}} {{template "ssl-host" $server.SSL}}{{- end}}
     {{if $server.NeedsDefaultLocation -}} {{template "default-location" $}}{{- end}}
 
     {{range $path, $location := $server.Locations -}}
@@ -62,6 +65,7 @@ http {
   {{end}}
 
   {{template "default-server" .}}
+  {{if .Config.Nginx.SSLEnabled}}{{template "default-ssl-server" .}}{{end}}
 }
 `
 
@@ -88,11 +92,43 @@ events {
   }
 {{- end}}
 
+{{define "default-ssl-server" -}}
+  # Default server that will just close the connection as if there was no server available
+  server {
+    listen {{.Config.Nginx.SSLPort}} default_server ssl;
+    # SSL Options
+    ssl_ciphers HIGH:!aNULL:!MD5:!DH+3DES:!kEDH;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_certificate {{.Config.Nginx.SSLCert}};
+    ssl_certificate_key {{.Config.Nginx.SSLKey}};
+
+    location = {{.Config.Nginx.StatusPath}} {
+      return 200;
+    }
+
+    location / {
+      return 444;
+    }
+  }
+{{- end}}
+
 {{define "default-location" -}}
     # Here to avoid returning the nginx welcome page for servers that do not have a "/" location.  (Issue #35)
     location / {
       {{.DefaultLocationReturn}}
     }
+{{- end}}
+
+{{define "ssl-host" -}}
+    # SSL Options
+    ssl_ciphers HIGH:!aNULL:!MD5:!DH+3DES:!kEDH;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_certificate {{.Certificate}};
+    ssl_certificate_key {{.Key}};
+    {{if .ClientCertificate -}}
+    ssl_client_certificate {{.ClientCertificate}};
+    ssl_verify_client on;
+    {{- end}}
 {{- end}}
 
 {{define "upstream-healthcheck" -}}
@@ -142,9 +178,16 @@ events {
 `
 )
 
+type sslOptions struct {
+	Certificate       string  // path to certficate fil
+	Key               string  // path to key
+	ClientCertificate *string // optional path to a client verification certificate
+}
+
 type hostT struct {
 	HostOptions          *router.HostOptions
 	Locations            map[string]*locationT
+	SSL                  *sslOptions
 	NeedsDefaultLocation bool
 }
 
@@ -216,6 +259,63 @@ func defaultReturnFromConfig(config *router.Config) string {
 	return fmt.Sprintf("proxy_pass %s;", config.Nginx.DefaultLocationReturn)
 }
 
+func processSSLOptions(ns, hostname string, opts *router.SSLOptions, cache *router.Cache, config *router.Config) (*sslOptions, error) {
+	nsSecret, ok := cache.Secrets[ns]
+	if !ok {
+		return nil, fmt.Errorf("namespace secret missing for %s", ns)
+	}
+
+	if _, ok := nsSecret.Fields[opts.Certificate.ValueFrom.SecretKeyRef.Key]; !ok {
+		return nil, fmt.Errorf("namespace secret missing certificate field %s", opts.Certificate.ValueFrom.SecretKeyRef.Key)
+	}
+
+	if _, ok := nsSecret.Fields[opts.Key.ValueFrom.SecretKeyRef.Key]; !ok {
+		return nil, fmt.Errorf("namespace secret missing key field %s", opts.Key.ValueFrom.SecretKeyRef.Key)
+	}
+
+	baseDir := fmt.Sprintf("%s/%s", config.Nginx.SSLCertificateDir, hostname)
+	ssl := &sslOptions{
+		Certificate: fmt.Sprintf("%s/certificate.crt", baseDir),
+		Key:         fmt.Sprintf("%s/certificate.key", baseDir),
+	}
+
+	if opts.ClientCertficate != nil {
+		if _, ok := nsSecret.Fields[opts.ClientCertficate.ValueFrom.SecretKeyRef.Key]; !ok {
+			return nil, fmt.Errorf("namespace secret missing certificate field %s", opts.ClientCertficate.ValueFrom.SecretKeyRef.Key)
+		}
+
+		clientCertificateFile := fmt.Sprintf("%s/clientCertificate.crt", baseDir)
+		ssl.ClientCertificate = &clientCertificateFile
+	}
+
+	// If not running in mock mode write cert to disk
+	if !config.Nginx.RunInMockMode {
+		err := os.MkdirAll(baseDir, 0700)
+		if err != nil {
+			return nil, err
+		}
+
+		err = ioutil.WriteFile(ssl.Certificate, nsSecret.Fields[opts.Certificate.ValueFrom.SecretKeyRef.Key], 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write certificate to %s", ssl.Certificate)
+		}
+
+		err = ioutil.WriteFile(ssl.Key, nsSecret.Fields[opts.Key.ValueFrom.SecretKeyRef.Key], 0600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write key to %s", ssl.Key)
+		}
+
+		if ssl.ClientCertificate != nil {
+			err = ioutil.WriteFile(*ssl.ClientCertificate, nsSecret.Fields[opts.ClientCertficate.ValueFrom.SecretKeyRef.Key], 0644)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write client cert to %s", *ssl.ClientCertificate)
+			}
+		}
+	}
+
+	return ssl, nil
+}
+
 /*
 GetConf takes the router cache and returns a generated nginx configuration
 */
@@ -237,11 +337,31 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 		for hostName, opts := range ns.Hosts {
 			// If hostT does not exist for hostname create one.
 			if _, ok := tmplData.Hosts[hostName]; !ok {
-				tmplData.Hosts[hostName] = &hostT{
+
+				hostData := &hostT{
 					HostOptions:          &opts,
 					Locations:            make(map[string]*locationT),
 					NeedsDefaultLocation: true,
 				}
+
+				// Convert ssl options
+				if opts.SSLOptions != nil {
+
+					// If ssl is disabled do not route pods/ns
+					if !config.Nginx.SSLEnabled {
+						log.Printf("  Nginx Config: Found ssl enabled hostname (%s) but ssl is disabled.\n", hostName)
+						continue
+					}
+
+					sslOpts, err := processSSLOptions(ns.Name, hostName, opts.SSLOptions, cache, config)
+					if err != nil {
+						log.Printf("  Nginx Config: Invalid ssl options for host %s: %v\n", hostName, err)
+						continue
+					}
+					hostData.SSL = sslOpts
+				}
+
+				tmplData.Hosts[hostName] = hostData
 			} else {
 				// Multiple namespace use the same host.
 				// TODO: In the future merge hostOptions
@@ -259,7 +379,11 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 
 		for hostName := range podNs.Hosts {
 			// Host always exists we just created it above
-			host, _ := tmplData.Hosts[hostName]
+			host, ok := tmplData.Hosts[hostName]
+			if !ok {
+				log.Printf("  Nginx Config: Missing host config (%s) for pod %s\n", hostName, pod.Name)
+				continue
+			}
 
 			for _, route := range pod.Routes {
 				upstreamKey := hostName + route.Incoming.Path
@@ -280,9 +404,9 @@ func GetConf(config *router.Config, cache *router.Cache) string {
 					// Calculate secret for location
 					var locationSecret string
 					secret, ok := cache.Secrets[pod.Namespace]
-					if ok {
+					if ok && secret.RoutingKey != nil {
 						// Guaranteed to be an API Key so no need to double check
-						locationSecret = base64.StdEncoding.EncodeToString(secret.Data)
+						locationSecret = base64.StdEncoding.EncodeToString(*secret.RoutingKey)
 					}
 
 					host.Locations[route.Incoming.Path] = &locationT{

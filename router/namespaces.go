@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	"hash/fnv"
 	"k8s.io/client-go/kubernetes"
 	api "k8s.io/client-go/pkg/api/v1"
@@ -48,10 +49,36 @@ type Namespace struct {
 	hash uint64
 }
 
+// SecretRef ref to secret field
+type SecretRef struct {
+	Key string `json:"key"`
+}
+
+// ValueFrom specify reference to a secret
+type ValueFrom struct {
+	SecretKeyRef *SecretRef `json:"secretKeyRef,omitempty"`
+}
+
+// OptionValue value from ref
+type OptionValue struct {
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
+}
+
+/*
+SSLOptions contains options for the host
+*/
+type SSLOptions struct {
+	Certificate      OptionValue  `json:"certificate"`
+	Key              OptionValue  `json:"certificateKey"`
+	ClientCertficate *OptionValue `json:"clientCertificate,omitempty"`
+}
+
 /*
 HostOptions contains any options for the host. Nothing right now.
 */
-type HostOptions struct{}
+type HostOptions struct {
+	SSLOptions *SSLOptions `json:"ssl,omitempty"`
+}
 
 /*
 ID returns the namespace's name
@@ -185,7 +212,7 @@ func getHostsFromNamespace(config *Config, namespace *api.Namespace) map[string]
 	}
 
 	// Process the routing hosts
-	for host := range hosts {
+	for host, options := range hosts {
 		valid := hostnameRegex.MatchString(host)
 
 		if !valid {
@@ -196,9 +223,45 @@ func getHostsFromNamespace(config *Config, namespace *api.Namespace) map[string]
 				log.Printf("Namespace (%s) host issue: %s (%s) is not a valid hostname/ip\n", namespace.Name, config.NamespaceHostsAnnotation, host)
 				continue
 			}
+
+			// If host has ssl options validate options
+			if options.SSLOptions != nil {
+				if err := validSSLOptions(options.SSLOptions); err != nil {
+					delete(hosts, host)
+					log.Printf("Namespace (%s) ssl options issue: %v\n", namespace.Name, err)
+				}
+			}
+
 		}
 	}
 	return hosts
+}
+
+func validSSLOptions(opts *SSLOptions) error {
+	if opts.Certificate.ValueFrom == nil {
+		return fmt.Errorf("certificate option missing valueFrom")
+	}
+	if opts.Certificate.ValueFrom.SecretKeyRef == nil {
+		return fmt.Errorf("certificate option missing secretKeyRef")
+	}
+
+	if opts.Key.ValueFrom == nil {
+		return fmt.Errorf("key option missing valueFrom")
+	}
+	if opts.Key.ValueFrom.SecretKeyRef == nil {
+		return fmt.Errorf("key option missing secretKeyRef")
+	}
+
+	if opts.ClientCertficate != nil {
+		if opts.ClientCertficate.ValueFrom == nil {
+			return fmt.Errorf("client certificate option missing valueFrom")
+		}
+		if opts.ClientCertficate.ValueFrom.SecretKeyRef == nil {
+			return fmt.Errorf("client certificate option missing secretKeyRef")
+		}
+	}
+
+	return nil
 }
 
 /*

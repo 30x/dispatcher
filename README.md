@@ -2,7 +2,7 @@
 
 The purpose of this project is to provide a name and path based router for Kubernetes. It started out as an ingress
 controller but has since been repurposed to allow for both ingress and other types of routing via to its
-configurability.  From an ingress perspective, this router does things a little different than your typical 
+configurability.  From an ingress perspective, this router does things a little different than your typical
 [Kubernetes Ingress controller](http://kubernetes.io/docs/user-guide/ingress/):
 
 * This version does pod-level routing instead of service-level routing
@@ -18,18 +18,18 @@ But in the end, you have a routing controller capable of doing routing based on 
 
 This router is written in Go and is intended to be deployed within a container on Kubernetes.  Upon startup, this router
 will find the [Pods](http://kubernetes.io/docs/user-guide/pods/) and [Namespaces](http://kubernetes.io/docs/user-guide/namespaces/)
-marked for routing _(using a configurable label selector)_ and the [Secrets](http://kubernetes.io/docs/user-guide/secrets/) 
-*(using a configurable location)_ used to secure routing for those pods.  _(For more details on the role secrets play in 
-this router, please see the [Security section](#security) of this document.)_ 
+marked for routing _(using a configurable label selector)_ and the [Secrets](http://kubernetes.io/docs/user-guide/secrets/)
+*(using a configurable location)_ used to secure routing for those pods.  _(For more details on the role secrets play in
+this router, please see the [Security section](#security) of this document.)_
 
 ### Namespaces
 
 The Namespaces marked for routing are then analyzed to identify wiring information used for routign stored in the Namespace's [annotations](http://kubernetes.io/docs/user-guide/annotations/) and [labels](http://kubernetes.io/docs/user-guide/labels/).
 
 Annotations:
-* `github.com/30x.dispatcher.hosts`: Stores host-level configuration for each host associated with Namespace. JSON document, whose 
-keys are the actual hostnames and whose values are the host-specific configuration. At this time, there is no extra configuration 
-available at the host level.  This is a forward-thinking approach to allow for future enhancements.
+* `github.com/30x.dispatcher.hosts`: Stores host-level configuration for each host associated with Namespace. JSON document, whose
+keys are the actual hostnames and whose values are the host-specific configuration.
+Host-specific configuration currently only supports enabling SSL.
 
 ```
 annotations:
@@ -39,10 +39,17 @@ annotations:
       “thoughtspark.org”: {}
     }
 ```
+Host-specific configuration:
+
+`ssl`: See [SSL Support](#ssl-support)
+   - `certificate`: Provide a reference to the namespace's routing secret field that contains the servers ssl certificate. Eg. `{ "valueFrom": {"secretKeyRef" : {"key":"ssl.crt"}}}`
+   - `certificateKey`: Provide a reference to the namespace's routing secret field that contains the servers ssl certificate key. Eg. `{ "valueFrom": {"secretKeyRef" : {"key":"ssl.key"}}}`
+   - (Optional) `clientCertificate`: Provide a reference to the namespace's routing secret field that contains a client verification certificate. Eg. `{ "valueFrom": {"secretKeyRef" : {"key":"client.crt"}}}`
+
 
 Labels:
-* `github.com/30x.dispatcher.org`: String representing the Apigee organization assocatated with Namespace.
-* `github.com/30x.dispatcher.env`: String representing the Apigee enviorment assocatated with Namespace.
+* `github.com/30x.dispatcher.org`: String representing the Apigee organization associated with Namespace.
+* `github.com/30x.dispatcher.env`: String representing the Apigee environment associated with Namespace.
 
 ### Pods
 
@@ -65,10 +72,10 @@ the nginx configuration and reload it.  _(The idea here was to allow for an init
 to use the events for as quick a turnaround as possible.)_  Events are processed in 2 second chunks.
 
 Each Pod can expose one or more services by using one or more entries in the `github.com/30x.dispatcher.paths` annotation. All of the
-paths exposed via `github.com/30x.dispatcher.paths` are exposed for each of the hosts listed in the `github.com/30x.dispatcher.hosts` 
-annotation of its corresponding Namespace.  _(So if you have a traffic Hosts of `host1 host2` and a `github.com/30x.dispatcher.path` of 
+paths exposed via `github.com/30x.dispatcher.paths` are exposed for each of the hosts listed in the `github.com/30x.dispatcher.hosts`
+annotation of its corresponding Namespace.  _(So if you have a traffic Hosts of `host1 host2` and a `github.com/30x.dispatcher.path` of
 `[{"basePath": "/", "containerPort": "80"},{"basePath": "/nodejs", "containerPort": "3000"}]`, you would have 4 separate nginx location
- blocks: `host1/ -> {PodIP}:80`, `host2/ -> {PodIP}:80`, `host1/nodejs -> {PodIP}:3000` and `host2/nodejs -> {PodIP}:3000` 
+ blocks: `host1/ -> {PodIP}:80`, `host2/ -> {PodIP}:80`, `host1/nodejs -> {PodIP}:3000` and `host2/nodejs -> {PodIP}:3000`
  Right now there is no way to associate specific paths to specific hosts but it may be something we support in the future.)_
 
 # Configuration
@@ -93,6 +100,10 @@ Nginx Configuration:
 * `NGINX_MAX_CLIENT_BODY_SIZE`: Configures the max client request body size of nginx. _(Default: `0`, Disables checking of client request body size.)_
 * `NGINX_STATUS_PATH`: Change the nginx status path that returns 200 on the default server. (Default: `/dispatcher/status`)
 * `PORT`: This is the port that nginx will listen on _(Default: `80`)_
+* `SSL_PORT`: This is the SSL port nginx will listen on for ssl enabled hosts. _(Default: `443`)_
+* `SSL_CERT`: Path to a ssl certificate used for the default ssl nginx server. Enables SSL support.
+* `SSL_KEY`: Path to a ssl certificate key used for the default ssl nginx server.
+* `SSL_CERT_DIR`: Path to write namespace host's certificates to. _(Default: `/etc/nginx/ssl`)_
 
 # Security
 
@@ -121,6 +132,8 @@ configured such that the Pods servicing the traffic are from a single namespace.
 multiple namespaces to consume traffic for the same host and path combination, this falls apart.  While the routing will
 work fine in this situation, the router's API Key is namespace specific and the first seen API Key is the one that is
 used.
+
+**Note:** With SSL support you can use client certificate verification as a replacement to the routing key or use both methods. See [SSL Support](#ssl-support)
 
 # Streaming Support
 
@@ -155,6 +168,94 @@ everyone, we just leave it up to the client to make an HTTP 1.1 request.
 So when you look at the generated nginx configuration and see some duplicate configuration related to WebSockets, or
 you see that we are not forcing HTTP 1.1, now you know.
 
+# SSL Support
+
+Dispatcher allows for hosts to specify SSL/TLS options to enable encryption on
+all paths within a host. It allows for both a server certificate/key to be specified through
+the namespace's routing secret as well as an optional client verification certificate.
+
+Take the example below of a namespace and namespace secret, the `ssl` property on the host's
+options specifies `certificate` and `certificateKey` as a reference to a field within the namespaces `routing` secret.
+Optionally you can specify `clientCertificate` to provide a client verification certificate.
+
+``` yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-namespace
+  annotations:
+    github.com/30x.dispatcher.hosts: |
+      {
+        "secure.dev": {
+          "ssl": {
+            "certificate": { "valueFrom": {"secretKeyRef" : {"key":"ssl.crt"}}},
+            "certificateKey": { "valueFrom": {"secretKeyRef" : {"key":"ssl.key"}}}
+          }
+        }
+      }
+  labels:
+    github.com/30x.dispatcher.routable: "true"
+    github.com/30x.dispatcher.org: "example"
+    github.com/30x.dispatcher.env: "test"
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: routing
+  namespace: test-namespace
+data:
+  ssl.crt: <base64 ssl.crt>
+  ssl.key: <base64 ssl.key>
+
+---
+```
+
+The nginx config will contain a virtual host for `secure.dev` with SSL enabled and
+the certificate/key path specified. Dispatcher when generating the nginx config will
+take the values from secret and write them to disk at `/etc/nginx/ssl/<host>/certificate.crt` and `/etc/nginx/ssl/<host>/certificate.key` by default. The path can be modified with `SSL_CERT_DIR`.
+
+If a host specifies a ssl configuration and the fields in the secret or secret itself do
+not exist that host will be ignored.
+
+**Note:** to enable SSL you must provide a default certificate/key used to generate the
+default server config for SSL port. If it is not specified all hosts/pods with SSL enable
+will be ignored.
+
+```
+server {
+  listen 443 ssl;
+  server_name secure.dev;
+  # SSL Options
+  ssl_ciphers HIGH:!aNULL:!MD5:!DH+3DES:!kEDH;
+  ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+  ssl_certificate /etc/nginx/ssl/secure.dev/certificate.crt;
+  ssl_certificate_key /etc/nginx/ssl/secure.dev/certificate.key;
+
+  ...
+}
+
+# Default server that will just close the connection as if there was no server available
+server {
+  listen 443 default_server ssl;
+  # SSL Options
+  ssl_ciphers HIGH:!aNULL:!MD5:!DH+3DES:!kEDH;
+  ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+  ssl_certificate ssl/default-server.crt;
+  ssl_certificate_key ssl/default-server.key;
+
+  location = /dispatcher/status {
+    return 200;
+  }
+
+  location / {
+    return 444;
+  }
+}
+```
+
+
 # Nginx Health Checks
 
 The router has an optional feature to enable nginx health checks on upstreams. It's only available when a when using nginx built with [nginx_upstream_check_module](https://github.com/xiaokai-wang/nginx_upstream_check_module) and enabled in the router with `ENABLE_NGINX_UPSTREAM_CHECK`.
@@ -180,10 +281,10 @@ upstream upstream619897598 {
   # Pod 1
   server 1.2.3.4;
 
-  # Upstream Health Check for nginx_upstream_check_module - https://github.com/yaoweibin/nginx_upstream_check_module 
+  # Upstream Health Check for nginx_upstream_check_module - https://github.com/yaoweibin/nginx_upstream_check_module
   check interval=10000 rise=2 fall=3 timeout=5000 port=0 type=http;
   check_http_send "GET /status HTTP/1.0\r\n\r\n";
-  check_http_expect_alive http_2xx; 
+  check_http_expect_alive http_2xx;
 }
 ```
 
@@ -424,7 +525,7 @@ http {
 }
 ```
 
-In this example the only thing that changes is the number of Pods in the nginx [upstream](http://nginx.org/en/docs/http/ngx_http_upstream_module.html). 
+In this example the only thing that changes is the number of Pods in the nginx [upstream](http://nginx.org/en/docs/http/ngx_http_upstream_module.html).
 Nginx will load balance across all pods using round-robin.
 
 I hope this example gave you a better idea of how this all works.  If not, let us know how to make it better.
@@ -595,4 +696,3 @@ but for now, this support is only as a convenience.
 This project is largly a refactor of [k8s-router](https://github.com/30x/k8s-router) with a few changes:
 * Usage of namespace annotations for hosts (and their configuration)
 * Usage of JSON documents in annotation values for hosts/paths configuration
-

@@ -22,19 +22,14 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/30x/dispatcher/router"
 )
 
 // NginxConfPath for nginx configuration location
 const NginxConfPath = "/etc/nginx/nginx.conf"
 
-// RunInMockMode enables starting/stopping nginx if disabled. In mock mode starting/stopping is ignored.
-var RunInMockMode bool
-
 func shellOut(cmd string, exitOnFailure bool) {
-	if RunInMockMode {
-		return
-	}
-
 	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 
 	if err != nil {
@@ -49,12 +44,6 @@ func shellOut(cmd string, exitOnFailure bool) {
 }
 
 func writeNginxConf(conf string) {
-	log.Println(conf)
-
-	if RunInMockMode {
-		return
-	}
-
 	// Create the nginx.conf file based on the template
 	if w, err := os.Create(NginxConfPath); err != nil {
 		log.Fatalf("Failed to open %s: %v", NginxConfPath, err)
@@ -68,25 +57,30 @@ func writeNginxConf(conf string) {
 /*
 RestartServer restarts nginx using the provided configuration.
 */
-func RestartServer(conf string, exitOnFailure bool) {
+func RestartServer(config *router.Config, conf string, exitOnFailure bool) {
 	log.Println("Reloading nginx with the following configuration:")
 
-	writeNginxConf(conf)
+	log.Println(conf)
 
-	log.Println("Restarting nginx")
-
-	shellOut("nginx -s reload", exitOnFailure)
+	// not in mock mode write conf and restart
+	if !config.Nginx.RunInMockMode {
+		writeNginxConf(conf)
+		log.Println("Restarting nginx")
+		shellOut("nginx -s reload", exitOnFailure)
+	}
 }
 
 /*
 StartServer starts nginx using the provided configuration.
 */
-func StartServer(conf string) {
+func StartServer(config *router.Config, conf string) {
 	log.Println("Starting nginx with the following configuration:")
+	log.Println(conf)
 
-	writeNginxConf(conf)
-
-	log.Println("Starting nginx")
-
-	shellOut("nginx", true)
+	// not in mock mode write conf and restart
+	if !config.Nginx.RunInMockMode {
+		writeNginxConf(conf)
+		log.Println("Starting nginx")
+		shellOut("nginx", true)
+	}
 }
