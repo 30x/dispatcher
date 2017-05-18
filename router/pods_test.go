@@ -9,7 +9,7 @@ import (
 )
 
 func path(basePath, port, targetPath string) pathAnnotation {
-	p := pathAnnotation{basePath, port, nil}
+	p := pathAnnotation{basePath, port, nil, nil}
 	if targetPath != "" {
 		p.TargetPath = &targetPath
 	}
@@ -821,5 +821,31 @@ func TestValidatePath(t *testing.T) {
 		if validatePath(path) == false {
 			t.Fatalf("Expected (%s) to pass.", path)
 		}
+	}
+}
+
+func TestPodWeight(t *testing.T) {
+	w := uint(5)
+	p := pathAnnotation{
+		BasePath:      "/node",
+		ContainerPort: "3000",
+		Weight:        &w,
+	}
+	pod1 := genPod("some-pod", genRoutes(p), "1.2.3.4", api.PodRunning, []string{"3000"})
+
+	if *pod1.Routes[0].Outgoing.Weight != 5 {
+		t.Fatalf("Expected pods route[0].Outgoing.Weight to be %d was %d", 5, *pod1.Routes[0].Outgoing.Weight)
+	}
+
+	w = uint(0)
+	p = pathAnnotation{
+		BasePath:      "/node",
+		ContainerPort: "3000",
+		Weight:        &w,
+	}
+	pod2 := genPod("some-pod", genRoutes(p), "1.2.3.4", api.PodRunning, []string{"3000"})
+
+	if len(pod2.Routes) != 0 {
+		t.Fatalf("Expected pods routes to be empty with invalid weight")
 	}
 }

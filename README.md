@@ -28,8 +28,7 @@ The Namespaces marked for routing are then analyzed to identify wiring informati
 
 Annotations:
 * `github.com/30x.dispatcher.hosts`: Stores host-level configuration for each host associated with Namespace. JSON document, whose
-keys are the actual hostnames and whose values are the host-specific configuration.
-Host-specific configuration currently only supports enabling SSL.
+keys are the actual hostnames and whose values are the host-specific configuration. Host-specific configuration currently only supports enabling SSL.
 
 ```
 annotations:
@@ -60,6 +59,7 @@ Annotations:
   * `basePath`: This is the request path the router uses to identify traffic for a specific application.
   * `containerPort`: This is the port of the container running the application logic handling traffic for the associated path.
   * `targetPath (optional):` This is the path that the target application is written to handle traffic for (If this configuration is omitted, the target request path is untouched.  If this configuration is provided, it is a URI rewrite of the path where the router path is replaced by the target path. For example, if your router path was /foo and your target path was /bar, a request for /foo/1 would be sent to the target as /bar/1)
+  * `weight (optional):` This is a nginx upstream weight associated with path. Can be an integer > 0. See: http://nginx.org/en/docs/http/ngx_http_upstream_module.html#server
 
 Labels:
 * `github.com/30x.dispatcher.app.name`: String representing the name of the application.
