@@ -56,6 +56,9 @@ http {
       proxy_http_version 1.1;
       proxy_set_header Connection "";
 
+      # Set Host Header, if not nginx will use upsteam's name 
+      proxy_set_header Host $http_host;
+
       #Upstream {{$location.Upstream}}
       proxy_pass http://{{$location.Upstream}}{{if $location.TargetPath}}{{$location.TargetPath}}{{end}};
     }
@@ -172,7 +175,6 @@ events {
 
   # Pass through the appropriate headers
   proxy_set_header Connection $p_connection;
-  proxy_set_header Host $http_host;
   proxy_set_header Upgrade $http_upgrade;
 {{- end}}
 `
