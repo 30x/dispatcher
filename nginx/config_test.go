@@ -158,7 +158,6 @@ func TestPartialHttpPreamble(t *testing.T) {
 		"client_max_body_size 0;", // default max body size 0
 		"proxy_http_version 1.1;",
 		"proxy_set_header Connection $p_connection;",
-		"proxy_set_header Host $http_host;",
 		"proxy_set_header Upgrade $http_upgrade;",
 		`map $http_connection $p_connection {
     default $http_connection;
@@ -315,6 +314,44 @@ func TestGetConfCheckUpstreams(t *testing.T) {
 	}
 	if idx := strings.Index(doc, "server 1.5.6.7:3000;"); idx < 0 {
 		t.Fatalf("Expected pod1 as a target with target 1.5.6.7:3000")
+	}
+}
+
+func TestGetConfCheckSetHeaderForLocation(t *testing.T) {
+	resetConf()
+	cache := router.NewCache()
+
+	cache.Namespaces["test-namespace"] = &router.Namespace{
+		Name:         "test-namespace",
+		Hosts:        map[string]router.HostOptions{"api.ex.net": router.HostOptions{}},
+		Organization: "some-org",
+		Environment:  "test",
+	}
+
+	cache.Pods["some-pod1"] = &router.PodWithRoutes{
+		Name:      "some-pod1",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users"},
+			Outgoing: &router.Outgoing{IP: "1.2.3.4", Port: "8080"},
+		}},
+	}
+
+	cache.Pods["some-pod2"] = &router.PodWithRoutes{
+		Name:      "some-pod2",
+		Namespace: "test-namespace",
+		Routes: []*router.Route{&router.Route{
+			Incoming: &router.Incoming{"/users2"},
+			Outgoing: &router.Outgoing{IP: "1.5.6.7", Port: "3000"},
+		}},
+	}
+
+	doc := GetConf(config, cache)
+
+	fmt.Println(doc)
+
+	if strings.Count(doc, "proxy_set_header Host $http_host;") != 2 {
+		t.Fatalf("Expected two proxy_set_header for each location")
 	}
 }
 
